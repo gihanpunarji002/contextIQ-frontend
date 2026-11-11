@@ -1,7 +1,13 @@
+import { useQuery } from "@tanstack/react-query";
+import { chatApi } from "../chat/api";
 import { Sun, Moon, Cpu } from "lucide-react";
 import { useTheme } from "../../app/providers/ThemeProvider";
 import { Badge, Button, Card } from "../../components/ui";
 export function Settings() {
+  const provider = useQuery({
+    queryKey: ["ai-status"],
+    queryFn: chatApi.status,
+  });
   const { theme, setTheme } = useTheme();
   return (
     <>
@@ -40,22 +46,33 @@ export function Settings() {
         <Card>
           <div className="section-heading">
             <h2>AI provider</h2>
-            <Badge>Coming in Phase 1</Badge>
+            <Badge>{provider.data?.mode || "Loading"}</Badge>
           </div>
           <div className="provider-row">
             <Cpu size={28} />
             <div>
-              <strong>Gemini via a server-side provider</strong>
+              <strong>
+                {!provider.data
+                  ? "Provider status unavailable"
+                  : provider.data.mode === "OLLAMA"
+                    ? `Ollama · ${provider.data.model}`
+                    : provider.data.mode === "MOCK" ? "Mock provider" : "OpenAI · Backend update required"}
+              </strong>
               <p>
-                Currently using MockAiChatService. No API key is required or
-                collected here.
+                {provider.data?.mode === "OLLAMA" && provider.data.configured
+                  ? "Spring AI uses your local Ollama model. No OpenAI API key is needed."
+                  : provider.data?.mode === "OPENAI"
+                    ? "Rebuild and recreate the backend container to activate Ollama."
+                    : provider.data?.mode === "MOCK"
+                      ? "Demo mode is active. Set AI_MODE=OLLAMA and recreate the backend container."
+                      : "Check the Ollama model and backend connection settings. No API key is required."}
               </p>
             </div>
           </div>
         </Card>
         <Card>
           <h2>About this environment</h2>
-          <p className="muted">ContextIQ · Phase 0 foundation</p>
+          <p className="muted">ContextIQ · Phase 3 · Document RAG</p>
           <p>
             Account sign-in is enabled. Team membership and tenant isolation are
             still planned. This environment is intended for local development

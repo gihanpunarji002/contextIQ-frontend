@@ -1322,3 +1322,13 @@ tr:last-child td {
     grid-template-columns: 1fr;
   }
 }
+
+.rag-upload { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; margin: 1rem 0; }
+.rag-upload input { flex: 1 1 16rem; min-width: 0; }
+.rag-mode { flex-wrap: wrap; }
+.rag-mode label { display: flex; align-items: center; gap: .6rem; font-weight: 600; }
+.rag-mode input { accent-color: #7c3aed; width: 1rem; height: 1rem; }
+.rag-sources { margin-top: 1rem; border-top: 1px solid var(--border); padding-top: .7rem; }
+.rag-sources details { margin-top: .6rem; }
+.rag-sources summary { cursor: pointer; font-weight: 600; overflow-wrap: anywhere; }
+.rag-sources details p { white-space: pre-wrap; font-size: .85rem; max-height: 16rem; overflow: auto; }

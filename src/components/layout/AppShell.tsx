@@ -107,7 +107,7 @@ export function AppShell() {
               <Icon size={19} />
               <span className="nav-label">{label}</span>
               {path === "/chat" && (
-                <span className="nav-label tiny-tag">MOCK</span>
+                <span className="nav-label tiny-tag">AI</span>
               )}
             </NavLink>
           ))}

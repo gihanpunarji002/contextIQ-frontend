@@ -209,7 +209,7 @@ export function AuthPage({ register = false }: { register?: boolean }) {
             </Link>
           </p>
           <p className="auth-help">
-            The assistant currently uses clearly labeled mock responses.
+            Your personal workspace for knowledge and AI conversations.
           </p>
         </div>
       </main>

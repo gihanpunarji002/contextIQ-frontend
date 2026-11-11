@@ -23,7 +23,7 @@ export function Dashboard() {
           <h1>A clearer view of everything.</h1>
           <p>One home for your team's knowledge, conversations, and ideas.</p>
         </div>
-        <Badge>Phase 0 · Foundation</Badge>
+        <Badge>Phase 3 · Document RAG</Badge>
       </div>
       <section className="hero">
         <div>
@@ -133,7 +133,7 @@ export function Dashboard() {
               [
                 "/chat",
                 "Start a conversation",
-                "Try the mock assistant",
+                "Ask the AI assistant",
                 MessageSquare,
               ],
               [
