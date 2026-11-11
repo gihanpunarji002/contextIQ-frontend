@@ -177,7 +177,7 @@ export function Chat() {
                     : mock ? "Try a conversation with the demo assistant." : "Update the backend to start chatting with Ollama."}
                   <br />
                   {live
-                    ? useDocuments ? "Upload TXT or Markdown in Documents, then ask a question about its contents." : "Recent messages are processed by your local Ollama model."
+                    ? useDocuments ? "Upload PDF, Word, TXT or Markdown in Documents, then ask a question about its contents." : "Recent messages are processed by your local Ollama model."
                     : mock ? "Messages are saved; responses are mock demonstrations." : "The running backend has not switched to Ollama yet."}
                 </p>
                 <div className="starters">

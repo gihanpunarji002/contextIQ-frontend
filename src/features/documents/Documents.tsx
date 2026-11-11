@@ -8,6 +8,13 @@ import { errorMessage } from "../../lib/api/client";
 export function Documents() {
   const [search, setSearch] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const extension = file?.name.split(".").pop()?.toLowerCase();
+  const fileLimit = extension === "txt" || extension === "md" ? 65536 : 10 * 1024 * 1024;
+  const fileError = file && (!extension || !["txt", "md", "pdf", "doc", "docx"].includes(extension))
+    ? "Choose a TXT, Markdown, PDF, DOC or DOCX file."
+    : file && (file.size === 0 || file.size > fileLimit)
+      ? "Choose a non-empty file: text up to 64 KiB, PDF/Word up to 10 MiB."
+      : null;
   const picker = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const documents = useQuery({ queryKey: ["documents"], queryFn: documentApi.list });
@@ -32,17 +39,18 @@ export function Documents() {
     </div>
     <Card>
       <h2>Add knowledge</h2>
-      <p className="muted">UTF-8 TXT or Markdown, up to 64 KiB per file. PDF, DOCX and OCR are not supported yet.</p>
-      <form className="rag-upload" onSubmit={e => { e.preventDefault(); if (file) upload.mutate(file); }}>
+      <p className="muted">PDF, DOC and DOCX up to 10 MiB; UTF-8 TXT and Markdown up to 64 KiB. Maximum 100,000 extracted characters. Scanned files need OCR, which is not enabled.</p>
+      <form className="rag-upload" onSubmit={e => { e.preventDefault(); if (file && !fileError) upload.mutate(file); }}>
         <label htmlFor="document-file">Choose a document</label>
-        <input className="input" ref={picker} id="document-file" type="file" accept=".txt,.md" disabled={upload.isPending}
+        <input className="input" ref={picker} id="document-file" type="file" accept=".txt,.md,.pdf,.doc,.docx" disabled={upload.isPending}
           onChange={e => { setFile(e.target.files?.[0] || null); upload.reset(); }} />
-        <Button className="primary" disabled={!file || upload.isPending} type="submit">
-          <Upload size={16} />{upload.isPending ? "Embedding and indexing…" : "Upload and index"}
+        <Button className="primary" disabled={!file || !!fileError || upload.isPending} type="submit">
+          <Upload size={16} />{upload.isPending ? "Extracting and indexing…" : "Upload and index"}
         </Button>
       </form>
-      {upload.isPending && <p role="status">Creating local embeddings. This can take a minute on the first upload. Keep this page open.</p>}
+      {upload.isPending && <p role="status">Extracting text and creating local embeddings. This can take a few minutes on the first upload. Keep this page open.</p>}
       {upload.isSuccess && <p role="status">Document indexed and ready for document chat.</p>}
+      {fileError && <ErrorState message={fileError} />}
       {upload.isError && <ErrorState message={errorMessage(upload.error)} />}
     </Card>
     <Card>
@@ -64,7 +72,7 @@ export function Documents() {
               <Trash2 size={16} /> Delete</Button></td>
           </tr>)}</tbody></table></div> :
         <EmptyState title={search ? "No matching documents" : "Build your knowledge library"}>
-          {search ? "Try a different filename." : "Upload a text document, then enable Search my documents in Chat."}
+          {search ? "Try a different filename." : "Upload a PDF, Word or text document, then enable Search my documents in Chat."}
         </EmptyState>}
     </Card>
   </>;

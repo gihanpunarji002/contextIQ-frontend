@@ -16,4 +16,4 @@ Chat is persisted via the API and labeled with its actual Ollama or MOCK provide
 
 ## Phase 3 document RAG
 
-Documents now upload/index private UTF-8 TXT/Markdown (64 KiB max) and support deletion. Chat has an explicit **Search my documents** toggle and saved, expandable source excerpts. Backend/PostgreSQL must be updated first; see [Phase 3 rollout](../ContextIQ/docs/phase-3-rag.md). Nomic and Gemma are called only by the backend. No browser API keys or Ollama access are needed.
+Documents now upload/index private PDF/DOC/DOCX (10 MiB max) and UTF-8 TXT/Markdown (64 KiB max) and support deletion. Chat has an explicit **Search my documents** toggle and saved, expandable source excerpts. Backend/PostgreSQL must be updated first; see [Phase 3 rollout](../ContextIQ/docs/phase-3-rag.md). Nomic and Gemma are called only by the backend. No browser API keys or Ollama access are needed.
