@@ -1,4 +1,13 @@
 import { api } from "../../lib/api/client";
+export interface SelectedDocument {
+  id: string;
+  filename: string;
+  available: boolean;
+}
+export interface DocumentContext {
+  useDocuments: boolean;
+  documents: SelectedDocument[];
+}
 export interface Conversation {
   id: string;
   title: string;
@@ -42,14 +51,36 @@ export interface AiStatus {
   model: string | null;
   configured: boolean;
   documentSearch?: boolean;
+  documentSelection?: boolean;
 }
 export const chatApi = {
+  context: async (id: string) =>
+    (await api.get<DocumentContext>(`/chat/conversations/${id}/documents`))
+      .data,
+  selectDocuments: async ({
+    id,
+    context,
+  }: {
+    id: string;
+    context: DocumentContext;
+  }) =>
+    (
+      await api.post<DocumentContext>(`/chat/conversations/${id}/documents`, {
+        useDocuments: context.useDocuments,
+        documentIds: context.documents.map((d) => d.id),
+      })
+    ).data,
   status: async () => (await api.get<AiStatus>("/ai/status")).data,
   conversations: async () =>
     (await api.get<Conversation[]>("/chat/conversations")).data,
   messages: async (id: string) =>
     (await api.get<Message[]>(`/chat/conversations/${id}/messages`)).data,
-  send: async (data: { message: string; conversationId?: string; useDocuments?: boolean }) =>
+  send: async (data: {
+    message: string;
+    conversationId?: string;
+    useDocuments?: boolean;
+    documentIds?: string[];
+  }) =>
     (await api.post<ChatReply>("/chat/messages", data, { timeout: 270000 }))
       .data,
 };

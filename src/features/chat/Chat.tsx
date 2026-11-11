@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, ArrowUp, ArrowUpRight, Sparkles, MessageSquare, Search, FileText, PenLine, ListChecks, Lightbulb, BookOpen, Compass, Pause, Play, Library, ShieldCheck } from "lucide-react";
-import { chatApi } from "./api";
+import { chatApi, type DocumentContext } from "./api";
 import { errorMessage } from "../../lib/api/client";
 import { useAuth } from "../../app/providers/AuthProvider";
 import { Button, EmptyState, ErrorState, LoadingState } from "../../components/ui";
+import { documentApi } from "../documents/api";
 import { AiOrb } from "./AiOrb";
 import "./chat.css";
 
@@ -19,6 +20,11 @@ const starters = [
 ];
 
 export function Chat() {
+  const [params] = useSearchParams();
+  return <ChatWorkspace key={params.get("conversation") || "new"} />;
+}
+
+function ChatWorkspace() {
   const [params, setParams] = useSearchParams();
   const id = params.get("conversation") || undefined;
   const [draft, setDraft] = useState("");
@@ -26,7 +32,8 @@ export function Chat() {
   const [motionPaused, setMotionPaused] = useState(false);
   const { user } = useAuth();
   const input = useRef<HTMLTextAreaElement>(null);
-  const [useDocuments, setUseDocuments] = useState(false);
+  const [newContext, setNewContext] = useState<DocumentContext>({ useDocuments: false, documents: [] });
+  const [documentSearch, setDocumentSearch] = useState("");
   const queryClient = useQueryClient();
   const provider = useQuery({
     queryKey: ["ai-status"],
@@ -36,7 +43,26 @@ export function Chat() {
   const mock = provider.data?.mode === "MOCK";
   const available = !!provider.data?.configured && !legacyProvider;
   const live = provider.data?.mode === "OLLAMA";
+  const supportsSelection = provider.data?.documentSelection === true;
   const supportsDocuments = live && provider.data?.documentSearch === true;
+  const savedContext = useQuery({ queryKey: ["conversation-documents", id], queryFn: () => chatApi.context(id!), enabled: !!id && supportsSelection });
+  const library = useQuery({ queryKey: ["documents"], queryFn: documentApi.list, enabled: supportsSelection });
+  const context = id ? savedContext.data ?? { useDocuments: false, documents: [] } : newContext;
+  const useDocuments = context.useDocuments;
+  const selectedDocuments = context.documents.map(d => ({ ...d, available: d.available && (!library.data || library.data.some(item => item.id === d.id)) }));
+  const saveSelection = useMutation({
+    mutationFn: chatApi.selectDocuments,
+    onSuccess: (data) => {
+      queryClient.setQueryData(["conversation-documents", id], data);
+      void queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+  });
+  const contextBusy = saveSelection.isPending || !supportsSelection || (!!id && (savedContext.isPending || savedContext.isError));
+  function updateContext(next: DocumentContext) {
+    if (send.isPending || contextBusy) return;
+    if (id) saveSelection.mutate({ id, context: next });
+    else setNewContext(next);
+  }
   const end = useRef<HTMLDivElement>(null);
   const conversations = useQuery({
     queryKey: ["conversations"],
@@ -54,6 +80,7 @@ export function Chat() {
       setParams({ conversation: data.conversationId });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["conversations"] }),
+        queryClient.invalidateQueries({ queryKey: ["conversation-documents", data.conversationId] }),
         queryClient.invalidateQueries({
           queryKey: ["messages", data.conversationId],
         }),
@@ -66,24 +93,26 @@ export function Chat() {
   function submit() {
     if (
       draft.trim() &&
-      !send.isPending &&
+      !send.isPending && !contextBusy &&
+      (!useDocuments || selectedDocuments.some(d => d.available)) &&
       available &&
       (!useDocuments || supportsDocuments) &&
       !(id && (messages.isError || messages.isPending))
     )
-      send.mutate({ message: draft.trim(), conversationId: id, useDocuments });
+      send.mutate({ message: draft.trim(), conversationId: id, useDocuments, documentIds: context.documents.map(d => d.id) });
   }
   function select(next?: string) {
-    if (send.isPending) return;
+    if (send.isPending || saveSelection.isPending) return;
     setParams(next ? { conversation: next } : {});
+    if (!next) setNewContext({ useDocuments: false, documents: [] });
     setDraft("");
     send.reset();
   }
 
   const history = (conversations.data || []).filter(c => c.title.toLowerCase().includes(historySearch.toLowerCase()));
   function choosePrompt(prompt: string, documents = false) {
-    if (send.isPending) return;
-    setUseDocuments(documents);
+    if (send.isPending || contextBusy) return;
+    updateContext({ ...context, useDocuments: documents });
     setDraft(prompt);
     input.current?.focus();
   }
@@ -100,6 +129,7 @@ export function Chat() {
         </div>
       </div>
       {provider.isError && <ErrorState message={errorMessage(provider.error)} retry={() => void provider.refetch()} />}
+      {provider.data && !supportsSelection && <div className="notice" role="status">Rebuild the backend to enable saved document selection. Sending is disabled until this update is applied.</div>}
       {legacyProvider && <div className="notice" role="status">Rebuild the backend to activate Ollama. Sending is disabled until the backend is updated.</div>}
       {provider.data && !available && !legacyProvider && <div className="notice" role="status">Ollama is not configured. Check the backend model and connection settings.</div>}
       <div className="studio-grid">
@@ -156,6 +186,7 @@ export function Chat() {
                         <details key={source.chunkId}>
                           <summary>[{index + 1}] {source.filename} · passage {source.chunkIndex + 1}</summary>
                           <p>{source.content}</p>
+                          <small>Saved excerpt from when this answer was generated.{library.data && !library.data.some(d => d.id === source.documentId) ? " Original document is unavailable (deleted)." : ""}</small>
                           <small>Similarity: {source.score.toFixed(3)} · retrieval score, not answer confidence</small>
                         </details>
                       ))}
@@ -184,6 +215,31 @@ export function Chat() {
             </div>
           )}
           <div className="studio-compose-area">
+            {id && supportsSelection && savedContext.isPending && <LoadingState />}
+            {savedContext.isError && <ErrorState message={errorMessage(savedContext.error)} retry={() => void savedContext.refetch()} />}
+            {saveSelection.isError && <ErrorState message={errorMessage(saveSelection.error)} retry={() => saveSelection.variables && saveSelection.mutate(saveSelection.variables)} />}
+            {(useDocuments || selectedDocuments.length > 0) && <section className="studio-document-selection" aria-label="Conversation documents">
+              <div className="studio-selected-chips">
+                {selectedDocuments.map(d => <span key={d.id} className={`studio-source-chip ${!d.available ? "unavailable" : ""}`}>
+                  <FileText size={14} /><span>{d.filename}{!d.available && <strong> · Unavailable (deleted)</strong>}</span>
+                  <button type="button" aria-label={`Remove ${d.filename} from selection`} disabled={send.isPending || contextBusy}
+                    onClick={() => updateContext({ ...context, documents: context.documents.filter(item => item.id !== d.id) })}>×</button>
+                </span>)}
+              </div>
+              <details className="studio-document-picker">
+                <summary>Select documents ({selectedDocuments.length}/50)</summary>
+                <label>Search your library<input value={documentSearch} onChange={e => setDocumentSearch(e.target.value)} placeholder="Find a document…" /></label>
+                {library.isPending ? <LoadingState /> : library.isError ? <ErrorState message={errorMessage(library.error)} retry={() => void library.refetch()} /> :
+                  <div className="studio-document-options">{library.data?.filter(d => d.filename.toLowerCase().includes(documentSearch.toLowerCase())).map(d => {
+                    const checked = context.documents.some(item => item.id === d.id);
+                    return <label key={d.id}><input type="checkbox" checked={checked} disabled={send.isPending || contextBusy || (!checked && selectedDocuments.length >= 50)}
+                      onChange={() => updateContext({ ...context, documents: checked ? context.documents.filter(item => item.id !== d.id) : [...context.documents, { id: d.id, filename: d.filename, available: true }] })} />
+                      <span>{d.filename}</span><small>{d.chunkCount} passages</small></label>;
+                  })}{!library.data?.some(d => d.filename.toLowerCase().includes(documentSearch.toLowerCase())) && <p>No documents found. <Link to="/documents">Open your library</Link></p>}</div>}
+              </details>
+              <small role="status">{saveSelection.isPending ? "Saving selection…" : useDocuments && !selectedDocuments.some(d => d.available) ? "Select at least one available document before sending." : id ? "Selection saved with this conversation." : "Selection will be saved with your first message."}</small>
+              {selectedDocuments.some(d => !d.available) && <p className="muted">Unavailable documents will not be searched. Earlier answer excerpts remain available as historical evidence.</p>}
+            </section>}
             {send.isError && <ErrorState message={`${errorMessage(send.error)} Check history before retrying: a timed-out request may already have saved.`} retry={() => submit()} />}
             <form className="studio-composer" onSubmit={e => { e.preventDefault(); submit(); }}>
               <label className="sr-only" htmlFor="message">Message the assistant</label>
@@ -194,11 +250,11 @@ export function Chat() {
                 <div className="studio-compose-tools">
                   <Link className="studio-library" to="/documents" aria-label="Upload or manage documents" title="Upload or manage documents"><Plus size={18} /></Link>
                   <label className={`studio-document-toggle ${useDocuments ? "active" : ""}`} title={!supportsDocuments ? "Update the backend to Phase 3 to enable document search" : "Ground answers in your indexed documents"}>
-                    <input type="checkbox" checked={useDocuments} disabled={!supportsDocuments || send.isPending} onChange={e => setUseDocuments(e.target.checked)} />
-                    <FileText size={14} /><span>Search my documents</span>
+                    <input type="checkbox" checked={useDocuments} disabled={(!supportsDocuments && !useDocuments) || send.isPending || contextBusy} onChange={e => updateContext({ ...context, useDocuments: e.target.checked })} />
+                    <FileText size={14} /><span>Search selected documents</span>
                   </label>
                 </div>
-                <Button className="studio-send" type="submit" aria-label="Send message" disabled={!draft.trim() || send.isPending || !available || (useDocuments && !supportsDocuments) || (!!id && (messages.isError || messages.isPending))}><ArrowUp size={19} /></Button>
+                <Button className="studio-send" type="submit" aria-label="Send message" disabled={!draft.trim() || send.isPending || contextBusy || (useDocuments && !selectedDocuments.some(d => d.available)) || !available || (useDocuments && !supportsDocuments) || (!!id && (messages.isError || messages.isPending))}><ArrowUp size={19} /></Button>
               </div>
             </form>
             <div className="studio-compose-note"><span>{mock ? "Demo mode · No LLM is called" : useDocuments ? "Document answers · Verify the source excerpts" : "General chat · No documents searched"}</span><span>Shift + Enter for a new line</span></div>
