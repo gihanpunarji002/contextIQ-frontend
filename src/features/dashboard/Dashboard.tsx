@@ -27,7 +27,7 @@ export function Dashboard() {
       </div>
       <section className="hero">
         <div>
-          <Badge>INTRODUCING CONTEXTIQ</Badge>
+          <Badge>INTRODUCING ZIPZIPY AI</Badge>
           <h2>
             Great answers start
             <br />

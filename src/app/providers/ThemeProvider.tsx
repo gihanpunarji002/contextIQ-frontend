@@ -13,7 +13,7 @@ const ThemeContext = createContext<{
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>(() => {
     try {
-      return localStorage.getItem("contextiq-theme") === "dark"
+      return localStorage.getItem("zipzipyai-theme") === "dark"
         ? "dark"
         : "light";
     } catch {
@@ -23,7 +23,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     try {
-      localStorage.setItem("contextiq-theme", theme);
+      localStorage.setItem("zipzipyai-theme", theme);
     } catch {
       /* Storage can be disabled. */
     }

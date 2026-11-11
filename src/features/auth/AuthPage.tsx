@@ -65,7 +65,7 @@ export function AuthPage({ register = false }: { register?: boolean }) {
           <span className="brand-icon">
             <Layers3 size={25} />
           </span>
-          ContextIQ
+          Zipzipy AI
         </Link>
         <div>
           <p className="eyebrow">YOUR KNOWLEDGE, CONNECTED</p>
@@ -83,11 +83,11 @@ export function AuthPage({ register = false }: { register?: boolean }) {
             <span>Your conversations belong to your account.</span>
           </div>
         </div>
-        <small>ContextIQ · Knowledge platform foundation</small>
+        <small>Zipzipy AI · Knowledge platform foundation</small>
       </aside>
       <main className="auth-main">
         <div className="auth-form-card">
-          <span className="badge">WELCOME TO CONTEXTIQ</span>
+          <span className="badge">WELCOME TO ZIPZIPY AI</span>
           <h1>{register ? "Create your account" : "Welcome back"}</h1>
           <p>
             {register
@@ -203,7 +203,7 @@ export function AuthPage({ register = false }: { register?: boolean }) {
             )
           )}
           <p className="auth-switch">
-            {register ? "Already have an account?" : "New to ContextIQ?"}{" "}
+            {register ? "Already have an account?" : "New to Zipzipy AI?"}{" "}
             <Link to={register ? "/login" : "/register"} state={location.state}>
               {register ? "Sign in" : "Create an account"}
             </Link>

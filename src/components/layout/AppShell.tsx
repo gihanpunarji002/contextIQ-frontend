@@ -60,9 +60,9 @@ export function AppShell() {
     return () => window.removeEventListener("keydown", close);
   }, [mobile]);
   const title =
-    navigation.find(([path]) => location.pathname === path)?.[1] || "ContextIQ";
+    navigation.find(([path]) => location.pathname === path)?.[1] || "Zipzipy AI";
   return (
-    <div className={`shell ${collapsed ? "collapsed" : ""}`}>
+    <div className={`shell ${collapsed ? "collapsed" : ""} ${location.pathname === "/chat" ? "assistant-shell" : ""}`}>
       <a className="skip" href="#main">
         Skip to content
       </a>
@@ -79,7 +79,7 @@ export function AppShell() {
             <Layers3 size={23} />
           </span>
           <span className="nav-label">
-            Context<span className="accent">IQ</span>
+            Zipzipy<span className="accent">AI</span>
           </span>
         </Link>
         <button
@@ -178,7 +178,7 @@ export function AppShell() {
           <Outlet />
         </main>
         <footer>
-          ContextIQ{" "}
+          Zipzipy AI{" "}
           <span>
             Foundation · Signed in as {user?.firstName || user?.email}
           </span>

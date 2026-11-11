@@ -8,7 +8,7 @@ export function errorMessage(error: unknown): string {
   if (axios.isAxiosError(error))
     return typeof error.response?.data?.detail === "string"
       ? error.response.data.detail
-      : "Could not reach ContextIQ. Check that the backend and database are running.";
+      : "Could not reach Zipzipy AI. Check that the backend and database are running.";
   return "Something went wrong. Please try again.";
 }
 
@@ -35,7 +35,7 @@ api.interceptors.response.use(
       error.response?.status === 401 &&
       !error.config?.url?.startsWith("/auth/")
     )
-      window.dispatchEvent(new Event("contextiq:session-expired"));
+      window.dispatchEvent(new Event("Zipzipy AI:session-expired"));
     return Promise.reject(error);
   },
 );

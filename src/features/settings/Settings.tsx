@@ -72,7 +72,7 @@ export function Settings() {
         </Card>
         <Card>
           <h2>About this environment</h2>
-          <p className="muted">ContextIQ · Phase 3 · Document RAG</p>
+          <p className="muted">Zipzipy AI · Phase 3 · Document RAG</p>
           <p>
             Account sign-in is enabled. Team membership and tenant isolation are
             still planned. This environment is intended for local development

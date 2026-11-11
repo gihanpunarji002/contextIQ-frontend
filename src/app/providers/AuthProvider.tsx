@@ -39,9 +39,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       void cache.cancelQueries().then(() => cache.clear());
     };
-    window.addEventListener("contextiq:session-expired", expired);
+    window.addEventListener("zipzipyai:session-expired", expired);
     return () =>
-      window.removeEventListener("contextiq:session-expired", expired);
+      window.removeEventListener("zipzipyai:session-expired", expired);
   }, []);
   async function accept(next: User) {
     await cache.cancelQueries();

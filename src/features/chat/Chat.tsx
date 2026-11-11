@@ -1,20 +1,31 @@
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, Send, Sparkles, MessageSquare } from "lucide-react";
+import { Plus, ArrowUp, ArrowUpRight, Sparkles, MessageSquare, Search, FileText, PenLine, ListChecks, Lightbulb, BookOpen, Compass, Pause, Play, Library, ShieldCheck } from "lucide-react";
 import { chatApi } from "./api";
 import { errorMessage } from "../../lib/api/client";
-import {
-  Badge,
-  Button,
-  EmptyState,
-  ErrorState,
-  LoadingState,
-} from "../../components/ui";
+import { useAuth } from "../../app/providers/AuthProvider";
+import { Button, EmptyState, ErrorState, LoadingState } from "../../components/ui";
+import { AiOrb } from "./AiOrb";
+import "./chat.css";
+
+const starters = [
+  { title: "Write something", description: "Find the right words.", icon: PenLine, prompt: "Help me draft a clear, concise project update for my team." },
+  { title: "Explore an idea", description: "Make room for your next idea.", icon: Lightbulb, prompt: "Help me brainstorm practical ideas for improving how our team shares knowledge." },
+  { title: "Make a plan", description: "Turn a goal into next steps.", icon: ListChecks, prompt: "Help me break a project into a practical plan. Ask me about the goal first." },
+  { title: "Find an answer", description: "Look inside your documents.", icon: Search, prompt: "What are the key decisions described in my documents?", documents: true },
+  { title: "Summarize a document", description: "Get to what matters most.", icon: BookOpen, prompt: "Summarize the main points in my documents and cite the supporting passages.", documents: true },
+  { title: "Explain a concept", description: "Make the complex feel simple.", icon: Compass, prompt: "Help me understand a new concept. Ask me what I would like to learn about." },
+];
+
 export function Chat() {
   const [params, setParams] = useSearchParams();
   const id = params.get("conversation") || undefined;
   const [draft, setDraft] = useState("");
+  const [historySearch, setHistorySearch] = useState("");
+  const [motionPaused, setMotionPaused] = useState(false);
+  const { user } = useAuth();
+  const input = useRef<HTMLTextAreaElement>(null);
   const [useDocuments, setUseDocuments] = useState(false);
   const queryClient = useQueryClient();
   const provider = useQuery({
@@ -50,7 +61,7 @@ export function Chat() {
     },
   });
   useEffect(() => {
-    end.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    end.current?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "nearest" });
   }, [messages.data, send.isPending]);
   function submit() {
     if (
@@ -68,132 +79,54 @@ export function Chat() {
     setDraft("");
     send.reset();
   }
+
+  const history = (conversations.data || []).filter(c => c.title.toLowerCase().includes(historySearch.toLowerCase()));
+  function choosePrompt(prompt: string, documents = false) {
+    if (send.isPending) return;
+    setUseDocuments(documents);
+    setDraft(prompt);
+    input.current?.focus();
+  }
+  const providerLabel = provider.isPending ? "Connecting…" : provider.isError ? "Provider unavailable"
+    : live ? `Ollama · ${provider.data?.model}` : mock ? "Mock AI · Demo" : "Backend update required";
   return (
-    <>
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">A SPACE TO THINK</p>
-          <h1>AI Assistant</h1>
-          <p>Ask questions. Explore ideas. Build shared understanding.</p>
+    <div className="assistant-studio">
+      <div className="studio-heading">
+        <div><span className="studio-eyebrow">A LITTLE CLARITY STARTS HERE</span><h1>Ask with AI Assistant</h1></div>
+        <div className="studio-heading-actions">
+          <span className={`studio-provider ${available ? "is-ready" : ""}`}><i />{providerLabel}</span>
+          <button className="icon-button" aria-label={motionPaused ? "Play AI orb animation" : "Pause AI orb animation"}
+            aria-pressed={motionPaused} onClick={() => setMotionPaused(!motionPaused)}>{motionPaused ? <Play size={16} /> : <Pause size={16} />}</button>
         </div>
-        <Badge>
-          {provider.isPending
-            ? "Checking provider…"
-            : provider.isError
-              ? "Provider unavailable"
-              : live
-                ? `Ollama · ${provider.data?.model}`
-                : mock ? "Mock AI · Demo mode" : "OpenAI · Backend update required"}
-        </Badge>
       </div>
-      {provider.isError && (
-        <ErrorState
-          message={errorMessage(provider.error)}
-          retry={() => void provider.refetch()}
-        />
-      )}
-      {legacyProvider && (
-        <div className="notice" role="status">
-          The backend is still running the previous OpenAI configuration. Rebuild
-          and recreate the backend container to activate Ollama. Sending is disabled
-          until the backend is updated. Refresh this page after updating.
-        </div>
-      )}
-      {provider.data && !available && !legacyProvider && (
-        <div className="notice" role="status">
-          Ollama is not configured. Check the backend model and connection settings.
-        </div>
-      )}
-      <div className="notice rag-mode">
-        <label><input type="checkbox" checked={useDocuments} disabled={!supportsDocuments || send.isPending}
-          onChange={e => setUseDocuments(e.target.checked)} /> Search my documents</label>
-        {live && !supportsDocuments && <span>Update the backend to Phase 3 to enable document search.</span>}
-        <span>{useDocuments ? "Answers use your indexed documents. Ask self-contained questions; source excerpts are saved with answers."
-          : "General chat. Enable document search to answer from your private library."}</span>
-      </div>
-      <div className="chat-layout">
-        <aside className="chat-history" aria-label="Conversation history">
-          <Button
-            className="primary"
-            disabled={send.isPending}
-            onClick={() => select()}
-          >
-            <Plus size={16} /> New conversation
-          </Button>
-          <p className="nav-caption">YOUR CONVERSATIONS</p>
-          {conversations.isPending ? (
-            <LoadingState />
-          ) : conversations.isError ? (
-            <ErrorState
-              message={errorMessage(conversations.error)}
-              retry={() => void conversations.refetch()}
-            />
-          ) : conversations.data.length === 0 ? (
-            <EmptyState title="A fresh start">
-              Your saved conversations will appear here.
-            </EmptyState>
-          ) : (
-            conversations.data.map((c) => (
-              <button
-                disabled={send.isPending}
-                className={`history-item ${id === c.id ? "selected" : ""}`}
-                key={c.id}
-                onClick={() => select(c.id)}
-              >
-                <MessageSquare size={16} />
-                <span>
-                  {c.title}
-                  <small>{new Date(c.updatedAt).toLocaleDateString()}</small>
-                </span>
-              </button>
-            ))
-          )}
-        </aside>
-        <section className="chat-panel" aria-label="Chat">
-          <div className="chat-panel-heading">
-            <span className="assistant-icon">
-              <Sparkles size={19} />
-            </span>
-            <div>
-              <strong>ContextIQ Assistant</strong>
-              <small>
-                {live
-                  ? useDocuments ? "Document chat · Retrieved sources" : "General AI chat"
-                  : mock ? "Deterministic mock responses" : "Waiting for Ollama backend"}
-              </small>
-            </div>
-            <Badge>{provider.data?.mode || "…"}</Badge>
+      {provider.isError && <ErrorState message={errorMessage(provider.error)} retry={() => void provider.refetch()} />}
+      {legacyProvider && <div className="notice" role="status">Rebuild the backend to activate Ollama. Sending is disabled until the backend is updated.</div>}
+      {provider.data && !available && !legacyProvider && <div className="notice" role="status">Ollama is not configured. Check the backend model and connection settings.</div>}
+      <div className="studio-grid">
+        <section className={`studio-canvas ${id || send.isPending ? "has-conversation" : ""}`} aria-label="AI Assistant chat">
+          <div className="studio-canvas-top"><span><Sparkles size={14} />{useDocuments ? "Connected to your knowledge" : "Your space to think"}</span>
+            <button className="studio-new" disabled={send.isPending} onClick={() => select()}><Plus size={15} /> New chat</button>
           </div>
-          <div className="messages" role="log" aria-live="polite">
-            {!id ? (
-              <div className="chat-welcome">
-                <span className="welcome-icon">
-                  <Sparkles size={30} />
-                </span>
-                <h2>What’s on your mind?</h2>
-                <p>
-                  {live
-                    ? "Think through a question with your AI assistant."
-                    : mock ? "Try a conversation with the demo assistant." : "Update the backend to start chatting with Ollama."}
-                  <br />
-                  {live
-                    ? useDocuments ? "Upload PDF, Word, TXT or Markdown in Documents, then ask a question about its contents." : "Recent messages are processed by your local Ollama model."
-                    : mock ? "Messages are saved; responses are mock demonstrations." : "The running backend has not switched to Ollama yet."}
-                </p>
-                <div className="starters">
-                  {[
-                    "What can ContextIQ help me do?",
-                    "Help me draft a concise project plan",
-                    "Help me organize team knowledge",
-                  ].map((text) => (
-                    <button key={text} onClick={() => setDraft(text)}>
-                      {text}
-                      <ArrowIcon />
-                    </button>
-                  ))}
-                </div>
+          {!id && !send.isPending ? (
+            <div className="studio-welcome">
+              <AiOrb paused={motionPaused} />
+              <span className="studio-welcome-label">IDEAS START WITH A CONVERSATION</span>
+              <h2>Welcome{user?.firstName ? `, ${user.firstName}` : " back"}<span>.</span></h2>
+              <p>A fresh perspective. A clearer answer. A place to begin.<br />What would you like to explore today?</p>
+              <div className="studio-starters">
+                {starters.map(({ title, description, icon: Icon, prompt, documents }) => (
+                  <button key={title} className="studio-prompt" disabled={!!documents && !supportsDocuments}
+                    title={documents && !supportsDocuments ? "Document search requires the Phase 3 Ollama backend" : undefined}
+                    onClick={() => choosePrompt(prompt, documents)}>
+                    <span className="studio-prompt-icons"><Icon size={19} strokeWidth={1.5} /><ArrowUpRight size={15} /></span>
+                    <strong>{title}</strong><small>{description}</small>
+                  </button>
+                ))}
               </div>
-            ) : messages.isPending ? (
+            </div>
+          ) : (
+            <div className="messages studio-messages" role="log" aria-live="polite" aria-label="Conversation messages">
+              {id && (messages.isPending ? (
               <LoadingState />
             ) : messages.isError ? (
               <ErrorState
@@ -213,7 +146,7 @@ export function Chat() {
                   <span className="message-author">
                     {m.role === "USER"
                       ? "You"
-                      : `ContextIQ · ${m.mode || "Unknown provider"}${m.model ? ` · ${m.model}` : ""}`}
+                      : `Zipzipy AI · ${m.mode || "Unknown provider"}${m.model ? ` · ${m.model}` : ""}`}
                   </span>
                   <p>{m.content}</p>
                   {m.retrievalUsed && (
@@ -242,83 +175,51 @@ export function Chat() {
                   </time>
                 </article>
               ))
-            )}
-            {send.isPending && (
-              <>
-                <article className="message user">
-                  <span className="message-author">You · Sending</span>
-                  <p>{send.variables?.message}</p>
-                </article>
-                <div className="state" role="status">
-                  <Sparkles size={18} />{" "}
-                  {live ? "Generating a response…" : "Preparing demo response…"}
+            ))}
+              {send.isPending && <>
+                <article className="message user"><span className="message-author">You · Sending</span><p>{send.variables?.message}</p></article>
+                <div className="studio-thinking" role="status"><AiOrb paused={motionPaused} small /><span>{mock ? "Preparing demo response" : useDocuments ? "Finding context and thinking" : "Thinking it through"}<span className="thinking-dots">…</span></span></div>
+              </>}
+              <div ref={end} />
+            </div>
+          )}
+          <div className="studio-compose-area">
+            {send.isError && <ErrorState message={`${errorMessage(send.error)} Check history before retrying: a timed-out request may already have saved.`} retry={() => submit()} />}
+            <form className="studio-composer" onSubmit={e => { e.preventDefault(); submit(); }}>
+              <label className="sr-only" htmlFor="message">Message the assistant</label>
+              <textarea id="message" ref={input} value={draft} maxLength={8000} rows={2} disabled={send.isPending}
+                onChange={e => setDraft(e.target.value)} placeholder={useDocuments ? "Ask a question about your documents…" : "Ask anything. Or start with a little inspiration…"}
+                onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); } }} />
+              <div className="studio-compose-toolbar">
+                <div className="studio-compose-tools">
+                  <Link className="studio-library" to="/documents" aria-label="Upload or manage documents" title="Upload or manage documents"><Plus size={18} /></Link>
+                  <label className={`studio-document-toggle ${useDocuments ? "active" : ""}`} title={!supportsDocuments ? "Update the backend to Phase 3 to enable document search" : "Ground answers in your indexed documents"}>
+                    <input type="checkbox" checked={useDocuments} disabled={!supportsDocuments || send.isPending} onChange={e => setUseDocuments(e.target.checked)} />
+                    <FileText size={14} /><span>Search my documents</span>
+                  </label>
                 </div>
-              </>
-            )}
-            <div ref={end} />
-          </div>
-          <div className="composer-area">
-            {send.isError && (
-              <ErrorState
-                message={`${errorMessage(send.error)} Check history before retrying: a timed-out request may already have saved.`}
-                retry={() => submit()}
-              />
-            )}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                submit();
-              }}
-              className="composer"
-            >
-              <label className="sr-only" htmlFor="message">
-                Message the assistant
-              </label>
-              <textarea
-                id="message"
-                value={draft}
-                maxLength={8000}
-                disabled={send.isPending}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder="Ask a question or share an idea…"
-                onKeyDown={(e) => {
-                  if (
-                    e.key === "Enter" &&
-                    !e.shiftKey &&
-                    !e.nativeEvent.isComposing
-                  ) {
-                    e.preventDefault();
-                    submit();
-                  }
-                }}
-              />
-              <Button
-                className="primary"
-                type="submit"
-                aria-label="Send message"
-                disabled={
-                  !draft.trim() ||
-                  send.isPending ||
-                  !available ||
-                  (useDocuments && !supportsDocuments) ||
-                  (!!id && (messages.isError || messages.isPending))
-                }
-              >
-                <Send size={18} />
-              </Button>
+                <Button className="studio-send" type="submit" aria-label="Send message" disabled={!draft.trim() || send.isPending || !available || (useDocuments && !supportsDocuments) || (!!id && (messages.isError || messages.isPending))}><ArrowUp size={19} /></Button>
+              </div>
             </form>
-            <p className="composer-note">
-              {live
-                ? useDocuments ? "AI can make mistakes. Check the retrieved source excerpts. Your question and passages stay with local Ollama." : "General chat: no documents are searched. Messages are processed by local Ollama."
-                : mock ? "Mock AI does not search documents or call an LLM." : "Ollama is not active. Update the backend before sending."}{" "}
-              <span>Shift + Enter for a new line</span>
-            </p>
+            <div className="studio-compose-note"><span>{mock ? "Demo mode · No LLM is called" : useDocuments ? "Document answers · Verify the source excerpts" : "General chat · No documents searched"}</span><span>Shift + Enter for a new line</span></div>
           </div>
         </section>
+        <aside className="studio-history" aria-label="Conversation history">
+          <div className="studio-history-heading"><h2>Recent conversations</h2><span>{conversations.data?.length ?? "—"}</span></div>
+          <p className="studio-history-subtitle">Pick up where you left off.</p>
+          <div className="studio-history-list">
+            {conversations.isPending ? <LoadingState /> : conversations.isError ? <ErrorState message={errorMessage(conversations.error)} retry={() => void conversations.refetch()} />
+              : history.length ? history.map(c => <button key={c.id} className={`studio-history-item ${id === c.id ? "selected" : ""}`} aria-current={id === c.id ? "true" : undefined} disabled={send.isPending} onClick={() => select(c.id)}>
+                <span className="studio-history-icon"><MessageSquare size={16} strokeWidth={1.5} /></span>
+                <span><strong>{c.title}</strong><time dateTime={c.updatedAt}>{new Date(c.updatedAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</time></span>
+                <ArrowUpRight size={13} />
+              </button>) : <div className="studio-history-empty"><MessageSquare size={25} strokeWidth={1} /><strong>{historySearch ? "No matching conversations" : "Your next idea starts here"}</strong><p>{historySearch ? "Try another search." : "Start a chat and it will be saved here for you."}</p></div>}
+          </div>
+          <Link to="/documents" className="studio-knowledge"><Library size={20} strokeWidth={1.5} /><strong>Bring your own context</strong><p>Add documents for answers grounded in your knowledge.</p><span>Open document library <ArrowUpRight size={13} /></span></Link>
+          <label className="studio-history-search"><Search size={16} /><input aria-label="Search conversations" placeholder="Search conversations" value={historySearch} onChange={e => setHistorySearch(e.target.value)} /></label>
+          <div className="studio-private"><ShieldCheck size={13} /> Conversations belong to your account</div>
+        </aside>
       </div>
-    </>
+    </div>
   );
-}
-function ArrowIcon() {
-  return <span aria-hidden="true">↗</span>;
 }
