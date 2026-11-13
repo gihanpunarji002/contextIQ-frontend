@@ -22,7 +22,6 @@ export function AiOrb({ paused = false, small = false }: { paused?: boolean; sma
         <radialGradient id={`${id}-light`}><stop stopColor="#cbccff" stopOpacity=".6" /><stop offset="1" stopColor="#a7adff" stopOpacity="0" /></radialGradient>
       </defs>
       <g className="ai-orb-body">
-        <path d="M100 24C137 19 174 55 174 96C181 135 143 174 105 176C61 181 23 147 25 105C19 64 60 25 100 24Z" fill={`url(#${id}-core)`} />
         <g className="ai-orb-ribbons" stroke={`url(#${id}-ribbon)`} strokeWidth="12">
           <ellipse cx="100" cy="100" rx="69" ry="39" transform="rotate(-48 100 100)" />
           <ellipse cx="100" cy="100" rx="69" ry="39" transform="rotate(35 100 100)" />

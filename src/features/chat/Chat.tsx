@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, ArrowUp, ArrowUpRight, Sparkles, MessageSquare, Search, FileText, PenLine, ListChecks, Lightbulb, BookOpen, Compass, Pause, Play, Library, ShieldCheck } from "lucide-react";
+import { Plus, ArrowUp, ArrowUpRight, Sparkles, MessageSquare, Search, FileText, PenLine, ListChecks, Lightbulb, BookOpen, Compass, Library, ShieldCheck } from "lucide-react";
 import { chatApi, type DocumentContext } from "./api";
 import { errorMessage } from "../../lib/api/client";
 import { useAuth } from "../../app/providers/AuthProvider";
@@ -22,22 +22,29 @@ const starters = [
   { title: "Explain a concept", description: "Make the complex feel simple.", icon: Compass, prompt: "Help me understand a new concept. Ask me what I would like to learn about." },
 ];
 
-export function Chat() {
+const workspaceStarters = [
+  { title: "Summarize the essentials", description: "Understand the selected documents.", icon: BookOpen, prompt: "Summarize the key points in the selected workspace documents. Cite the supporting passages.", documents: true },
+  { title: "Find a policy", description: "Get an answer with evidence.", icon: Search, prompt: "Help me find a policy in these documents. Ask which policy I need.", documents: true },
+  { title: "Compare the details", description: "Connect information across sources.", icon: ListChecks, prompt: "Compare the selected documents. Identify agreements, differences and gaps, citing sources.", documents: true },
+];
+type ChatVariant = "personal" | "workspace";
+export function Chat({ variant = "personal" }: { variant?: ChatVariant }) {
   const { workspace } = useWorkspace();
   const [params] = useSearchParams();
-  return <ChatWorkspace key={`${workspace.id}:${params.get("conversation") || "new"}`} />;
+  return <ChatWorkspace key={`${variant}:${workspace.id}:${params.get("conversation") || "new"}`} variant={variant} />;
 }
 
-function ChatWorkspace() {
+function ChatWorkspace({ variant }: { variant: ChatVariant }) {
+  const isWorkspace = variant === "workspace";
   const { workspace } = useWorkspace();
   const [params, setParams] = useSearchParams();
   const id = params.get("conversation") || undefined;
   const [draft, setDraft] = useState("");
   const [historySearch, setHistorySearch] = useState("");
-  const [motionPaused, setMotionPaused] = useState(false);
+  const motionPaused = false;
   const { user } = useAuth();
   const input = useRef<HTMLTextAreaElement>(null);
-  const [newContext, setNewContext] = useState<DocumentContext>({ useDocuments: false, documents: [], folders: [] });
+  const [newContext, setNewContext] = useState<DocumentContext>({ useDocuments: isWorkspace, documents: [], folders: [] });
   const queryClient = useQueryClient();
   const provider = useQuery({
     queryKey: ["ai-status"],
@@ -117,7 +124,7 @@ function ChatWorkspace() {
   function select(next?: string) {
     if (send.isPending || saveSelection.isPending) return;
     setParams(next ? { conversation: next } : {});
-    if (!next) setNewContext({ useDocuments: false, documents: [], folders: [] });
+    if (!next) setNewContext({ useDocuments: isWorkspace, documents: [], folders: [] });
     setDraft("");
     send.reset();
   }
@@ -129,35 +136,35 @@ function ChatWorkspace() {
     setDraft(prompt);
     input.current?.focus();
   }
-  const providerLabel = provider.isPending ? "Connecting…" : provider.isError ? "Provider unavailable"
-    : live ? `Ollama · ${provider.data?.model}` : mock ? "Mock AI · Demo" : "Backend update required";
+  // const providerLabel = provider.isPending ? "Connecting…" : provider.isError ? "Provider unavailable"
+  //   : live ? `Ollama · ${provider.data?.model}` : mock ? "Mock AI · Demo" : "Backend update required";
   return (
-    <div className="assistant-studio">
+    <div className={`assistant-studio ${isWorkspace ? "workspace-assistant" : "personal-assistant"}`}>
       <div className="studio-heading">
-        <div><span className="studio-eyebrow">A LITTLE CLARITY STARTS HERE</span><h1>Ask with AI Assistant</h1></div>
+        <div><span className="studio-eyebrow">{isWorkspace ? workspace.organizationName : "YOUR PRIVATE THINKING SPACE"}</span><h1>{isWorkspace ? "Workspace assistant" : "Personal AI Assistant"}</h1></div>
         <div className="studio-heading-actions">
-          <span className={`studio-provider ${available ? "is-ready" : ""}`}><i />{providerLabel}</span>
-          <button className="icon-button" aria-label={motionPaused ? "Play AI orb animation" : "Pause AI orb animation"}
-            aria-pressed={motionPaused} onClick={() => setMotionPaused(!motionPaused)}>{motionPaused ? <Play size={16} /> : <Pause size={16} />}</button>
+          {/* <span className={`studio-provider ${available ? "is-ready" : ""}`}><i />{providerLabel}</span> */}
+          {/* {!isWorkspace && <button className="icon-button" aria-label={motionPaused ? "Play AI orb animation" : "Pause AI orb animation"}
+            aria-pressed={motionPaused} onClick={() => setMotionPaused(!motionPaused)}>{motionPaused ? <Play size={16} /> : <Pause size={16} />}</button>} */}
         </div>
       </div>
+      <div className="assistant-scope-banner"><ShieldCheck size={17}/><div><strong>{isWorkspace ? workspace.name : "Personal workspace"}</strong><span>{isWorkspace ? "Choose documents or folders from this workspace. Sources and conversations stay within this boundary." : "Your personal documents and chats. Open a workspace to ask about organization knowledge."}</span></div>{isWorkspace && <Link to={`/workspaces/${workspace.id}/knowledge`}>View knowledge <ArrowUpRight size={14}/></Link>}</div>
       {provider.isError && <ErrorState message={errorMessage(provider.error)} retry={() => void provider.refetch()} />}
       {provider.data && !supportsSelection && <div className="notice" role="status">Rebuild the backend to enable saved document selection. Sending is disabled until this update is applied.</div>}
       {legacyProvider && <div className="notice" role="status">Rebuild the backend to activate Ollama. Sending is disabled until the backend is updated.</div>}
       {provider.data && !available && !legacyProvider && <div className="notice" role="status">Ollama is not configured. Check the backend model and connection settings.</div>}
       <div className="studio-grid">
         <section className={`studio-canvas ${id || send.isPending ? "has-conversation" : ""}`} aria-label="AI Assistant chat">
-          <div className="studio-canvas-top"><span><Sparkles size={14} />{useDocuments ? "Connected to your knowledge" : "Your space to think"}</span>
+          <div className="studio-canvas-top"><span><Sparkles size={14} />{useDocuments ? "Answers from selected sources" : "General conversation · no documents"}</span>
             <button className="studio-new" disabled={send.isPending} onClick={() => select()}><Plus size={15} /> New chat</button>
           </div>
           {!id && !send.isPending ? (
             <div className="studio-welcome">
-              <AiOrb paused={motionPaused} />
-              <span className="studio-welcome-label">IDEAS START WITH A CONVERSATION</span>
-              <h2>Welcome{user?.firstName ? `, ${user.firstName}` : " back"}<span>.</span></h2>
-              <p>A fresh perspective. A clearer answer. A place to begin.<br />What would you like to explore today?</p>
+              <span className="studio-welcome-label">{isWorkspace ? "KNOWLEDGE WITH CONTEXT" : "IDEAS START WITH A CONVERSATION"}</span>
+              <h2>{isWorkspace ? `Ask about ${workspace.name}` : `Welcome${user?.firstName ? `, ${user.firstName}` : " back"}`}<span>.</span></h2>
+              <p>{isWorkspace ? "Select workspace documents or folders below. Ask a question, then inspect the evidence behind the answer." : <>A fresh perspective. A clearer answer. A place to begin.<br />What would you like to explore today?</>}</p>
               <div className="studio-starters">
-                {starters.map(({ title, description, icon: Icon, prompt, documents }) => (
+                {(isWorkspace ? workspaceStarters : starters).map(({ title, description, icon: Icon, prompt, documents }) => (
                   <button key={title} className="studio-prompt" disabled={!!documents && !supportsDocuments}
                     title={documents && !supportsDocuments ? "Document search requires the Phase 3 Ollama backend" : undefined}
                     onClick={() => choosePrompt(prompt, documents)}>
@@ -256,7 +263,7 @@ function ChatWorkspace() {
         </section>
         <aside className="studio-history" aria-label="Conversation history">
           <div className="studio-history-heading"><h2>Recent conversations</h2><span>{conversations.data?.length ?? "—"}</span></div>
-          <p className="studio-history-subtitle">Pick up where you left off.</p>
+          <p className="studio-history-subtitle">{isWorkspace ? `Your private chats in ${workspace.name}.` : "Your personal conversations."}</p>
           <div className="studio-history-list">
             {conversations.isPending ? <LoadingState /> : conversations.isError ? <ErrorState message={errorMessage(conversations.error)} retry={() => void conversations.refetch()} />
               : history.length ? history.map(c => <button key={c.id} className={`studio-history-item ${id === c.id ? "selected" : ""}`} aria-current={id === c.id ? "true" : undefined} disabled={send.isPending} onClick={() => select(c.id)}>

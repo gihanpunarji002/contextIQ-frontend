@@ -17,7 +17,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [routeId, list.data, user?.id]);
   if (list.isPending) return <LoadingState />;
   if (list.isError) return <ErrorState message="Workspaces could not load. Check that the updated backend is available." retry={() => void list.refetch()} />;
-  const workspace = list.data.find(w => w.id === (routeId ?? selected)) ?? (!routeId ? list.data[0] : undefined);
+  const personalId = list.data.find(w => w.personal && w.id === user?.id)?.id;
+  const chosenId = location.pathname === "/chat" ? personalId : (routeId ?? selected);
+  const workspace = list.data.find(w => w.id === chosenId) ?? (!routeId && location.pathname !== "/chat" ? list.data[0] : undefined);
   if (!workspace) return <div className="state"><h1>Workspace unavailable</h1><p>Your access may have changed.</p><Link to="/workspaces">Return to workspaces</Link></div>;
   function select(id: string) { sessionStorage.setItem(`workspace:${user?.id}`, id); setSelected(id); navigate(`/workspaces/${id}`); }
   return <WorkspaceContext.Provider value={{ workspace, workspaces: list.data, select, canEdit: workspace.role !== "VIEWER", canAdmin: workspace.role === "ADMIN" }}>{children}</WorkspaceContext.Provider>;

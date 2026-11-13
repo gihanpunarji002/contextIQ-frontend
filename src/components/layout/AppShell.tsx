@@ -20,10 +20,12 @@ import { useTheme } from "../../app/providers/ThemeProvider";
 import { useAuth } from "../../app/providers/AuthProvider";
 import { errorMessage } from "../../lib/api/client";
 import { useWorkspace } from "../../app/providers/WorkspaceProvider";
+import { NotificationPanel } from "../../features/notifications/NotificationPanel";
+import { Breadcrumbs } from "./Breadcrumbs";
 import { ErrorState } from "../ui";
 const navigation = [
   ["/dashboard", "Overview", LayoutDashboard],
-  ["/chat", "AI Assistant", MessageSquare],
+  ["/chat", "Personal assistant", MessageSquare],
   ["/documents", "Documents", Files],
   ["/workspaces", "Workspaces", Users],
   ["/settings", "Settings", Settings],
@@ -61,8 +63,6 @@ export function AppShell() {
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
   }, [mobile]);
-  const title =
-    navigation.find(([path]) => location.pathname === path)?.[1] || (location.pathname.startsWith("/workspaces/") ? "Workspace" : "Zipzipy AI");
   return (
     <div className={`shell ${collapsed ? "collapsed" : ""} ${(location.pathname === "/chat" || location.pathname.endsWith("/assistant")) ? "assistant-shell" : ""}`}>
       <a className="skip" href="#main">
@@ -149,9 +149,7 @@ export function AppShell() {
             >
               <Menu />
             </button>
-            <span>{workspace.name}</span>
-            <span>/</span>
-            <strong>{title}</strong>
+            <Breadcrumbs />
           </div>
           <div className="top-actions">
             <span className="search-visual" title="Global search is planned">
@@ -164,6 +162,7 @@ export function AppShell() {
             >
               {theme === "light" ? <Moon size={19} /> : <Sun size={19} />}
             </button>
+            <NotificationPanel />
             <span className="avatar" title={user?.email}>
               {user?.firstName?.[0]?.toUpperCase() ||
                 user?.email[0].toUpperCase()}

@@ -113,3 +113,11 @@
 .studio-document-options label span { flex: 1; overflow-wrap: anywhere; min-width: 0; }
 .studio-document-options label small { white-space: nowrap; }
 .studio-document-selection > small { display: block; margin-top: 8px; }
+.assistant-scope-banner { display:flex; align-items:center; gap:12px; padding:13px 16px; margin-bottom:16px; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:var(--muted); }.assistant-scope-banner > svg { flex-shrink:0; color:var(--accent); }.assistant-scope-banner > div { display:grid; gap:4px; }.assistant-scope-banner strong { color:var(--text); font-size:.78rem; }.assistant-scope-banner span { font-size:.72rem; line-height:1.6; }.assistant-scope-banner a { display:flex; align-items:center; gap:4px; color:var(--accent); margin-left:auto; font-size:.72rem; white-space:nowrap; }
+.workspace-assistant .studio-welcome { padding-top:38px; padding-bottom:25px; }.workspace-assistant .studio-welcome h2 { font-size:1.8rem; letter-spacing:-.035em; }.workspace-assistant .studio-welcome > p { max-width:470px; }.workspace-assistant .studio-starters { grid-template-columns:repeat(3,minmax(0,1fr)); margin-top:28px; }.workspace-assistant-mark { display:flex; position:relative; align-items:center; justify-content:center; width:72px; height:72px; background:var(--surface); border:1px solid var(--border); border-radius:20px; margin:0 auto 22px; color:var(--accent); }.workspace-assistant-mark svg:last-child { position:absolute; right:9px; top:9px; }.workspace-assistant .studio-heading h1 { font-size:1.05rem; }
+@media(max-width:600px) { .assistant-scope-banner { flex-wrap:wrap; }.assistant-scope-banner a { margin-left:29px; }.workspace-assistant .studio-starters { grid-template-columns:1fr; }.workspace-assistant .studio-welcome h2 { font-size:1.5rem; } }
+
+.workspace-assistant .studio-heading h2 { font-size:1.05rem; margin:5px 0 0; }
+.workspace-assistant-mark { flex-shrink:0; }
+.workspace-assistant .studio-grid { height:calc(100dvh - 390px); min-height:590px; }
+@media(max-width:1000px) { .workspace-assistant .studio-grid { height:auto; } }
