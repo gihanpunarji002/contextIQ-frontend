@@ -8,7 +8,7 @@ import {
   ArrowUpRight,
 } from "lucide-react";
 import { useState } from "react";
-import { Link, NavLink, useParams, useNavigate } from "react-router";
+import { Link, useParams, useNavigate } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Button,
@@ -36,7 +36,7 @@ function Detail() {
     <div
       className={`workspace-page ${tab === "assistant" ? "workspace-chat-page" : ""}`}
     >
-      <header className="workspace-detail-heading">
+      {!tab && <header className="workspace-detail-heading">
         <div className="workspace-detail-identity">
           <span className="workspace-detail-icon">
             <Building2 size={29} />
@@ -60,20 +60,7 @@ function Detail() {
             {workspace.personal ? "Personal workspace" : "Team workspace"}
           </span>
         </div>
-      </header>
-      <nav className="workspace-tabs" aria-label="Workspace sections">
-        {[
-          ["", "Overview"],
-          ["knowledge", "Knowledge"],
-          ["assistant", "Workspace assistant"],
-          ["members", "Members"],
-          ["settings", "Settings"],
-        ].map(([path, label]) => (
-          <NavLink key={path} end to={`${root}${path ? `/${path}` : ""}`}>
-            {label}
-          </NavLink>
-        ))}
-      </nav>
+      </header>}
       {!tab ? (
         <>
           <div className="workspace-stats">
@@ -141,7 +128,7 @@ function Detail() {
         <Chat variant="workspace" />
       ) : tab === "members" ? (
         canAdmin ? (
-          <Members />
+          <section className="workspace-section-page"><header className="workspace-section-title"><div><p className="eyebrow">WORKSPACE ACCESS</p><h1>Members & access</h1><p>{workspace.name} · {workspace.organizationName}</p></div></header><Members /></section>
         ) : (
           <Card>
             <h2>Members</h2>
@@ -153,7 +140,7 @@ function Detail() {
         )
       ) : tab === "settings" ? (
         canAdmin ? (
-          <Settings />
+          <section className="workspace-section-page"><header className="workspace-section-title"><div><p className="eyebrow">CONFIGURATION</p><h1>Workspace settings</h1><p>{workspace.name} · {workspace.organizationName}</p></div></header><Settings /></section>
         ) : (
           <Card>
             <h2>Settings</h2>

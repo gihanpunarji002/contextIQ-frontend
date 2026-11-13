@@ -1,7 +1,7 @@
 import { api } from "../../lib/api/client";
 export interface Invitation {
   id: string; organizationId: string; organizationName: string; recipientEmail: string;
-  invitedByName: string; status: "PENDING" | "ACCEPTED" | "REJECTED" | "EXPIRED";
+  invitedByName: string; status: "PENDING" | "ACCEPTED" | "REJECTED" | "EXPIRED" | "CANCELLED";
   createdAt: string; expiresAt: string; readAt: string | null;
   emailStatus: "QUEUED" | "PROCESSING" | "SENT" | "FAILED" | "DISABLED" | "CANCELLED";
 }
@@ -12,6 +12,8 @@ export const notificationApi = {
   respond: async ({ id, decision }: { id: string; decision: "ACCEPT" | "REJECT" }) =>
     (await api.post<Invitation>(`/notifications/${id}/respond`, { decision })).data,
   sent: async (organization: string) => (await api.get<Invitation[]>(`/organizations/${organization}/invitations`)).data,
+  cancel: async ({ organization, id }: { organization: string; id: string }) =>
+    (await api.delete<Invitation>(`/organizations/${organization}/invitations/${id}`)).data,
   retryEmail: async ({ organization, id }: { organization: string; id: string }) =>
     (await api.post<Invitation>(`/organizations/${organization}/invitations/${id}/email`)).data,
 };

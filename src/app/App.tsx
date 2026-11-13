@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router";
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "./providers/ThemeProvider";
 import { AppShell } from "../components/layout/AppShell";
@@ -7,6 +7,8 @@ import { Chat } from "../features/chat/Chat";
 import { Documents } from "../features/documents/Documents";
 import { WorkspaceProvider } from "./providers/WorkspaceProvider";
 import { WorkspaceDetail } from "../features/workspaces/WorkspaceDetail";
+import { Organizations } from "../features/organizations/Organizations";
+import { OrganizationMembers } from "../features/organizations/OrganizationMembers";
 import { Workspaces } from "../features/workspaces/Workspaces";
 import { Settings } from "../features/settings/Settings";
 import { AuthProvider } from "./providers/AuthProvider";
@@ -31,7 +33,8 @@ export function App() {
                 element={<AuthPage key="register" register />}
               />
               <Route element={<RequireAuth />}>
-                <Route element={<WorkspaceProvider><AppShell /></WorkspaceProvider>}>
+                <Route element={<WorkspaceProvider><Outlet /></WorkspaceProvider>}>
+                <Route element={<AppShell />}>
                   <Route
                     path="/"
                     element={<Navigate to="/dashboard" replace />}
@@ -40,7 +43,8 @@ export function App() {
                   <Route path="/chat" element={<Chat />} />
                   <Route path="/documents" element={<Documents />} />
                   <Route path="/workspaces" element={<Workspaces />} />
-                  <Route path="/workspaces/:workspaceId/:tab?" element={<WorkspaceDetail />} />
+                  <Route path="/organizations" element={<Organizations />} />
+                  <Route path="/organizations/:organizationId/members" element={<OrganizationMembers />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route
                     path="*"
@@ -51,6 +55,11 @@ export function App() {
                       </div>
                     }
                   />
+                </Route>
+                <Route path="/workspaces/:workspaceId" element={<AppShell workspaceConsole />}>
+                  <Route index element={<WorkspaceDetail />} />
+                  <Route path=":tab" element={<WorkspaceDetail />} />
+                </Route>
                 </Route>
               </Route>
             </Routes>

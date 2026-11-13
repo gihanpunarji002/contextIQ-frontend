@@ -58,7 +58,7 @@ export function NotificationPanel() {
             {invite.status === "PENDING" ? <><small>Expires {new Date(invite.expiresAt).toLocaleDateString()}</small><div className="invitation-actions">
               <Button className="primary" disabled={respond.isPending} onClick={() => respond.mutate({ id: invite.id, decision: "ACCEPT" })}><Check size={14} /> Accept</Button>
               <Button disabled={respond.isPending} onClick={() => respond.mutate({ id: invite.id, decision: "REJECT" })}>Decline</Button>
-            </div></> : <small>{invite.status === "ACCEPTED" ? "You're a member. An admin can now assign your workspace access." : invite.status === "EXPIRED" ? "Ask an admin for a new invitation." : "You did not join this organization."}</small>}
+            </div></> : <small>{invite.status === "ACCEPTED" ? "You accepted this invitation. Workspace access is managed separately." : invite.status === "EXPIRED" ? "Ask an admin for a new invitation." : invite.status === "CANCELLED" ? "This invitation was withdrawn. Ask an admin if you still need access." : "You did not join this organization."}</small>}
           </div></article>)}
       </div>
       {(offset > 0 || notifications.data?.hasMore) && <div className="notification-pagination"><Button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - 20))}>Newer</Button><span>Page {offset / 20 + 1}</span><Button disabled={!notifications.data?.hasMore || offset >= 10000} onClick={() => setOffset(offset + 20)}>Older</Button></div>}

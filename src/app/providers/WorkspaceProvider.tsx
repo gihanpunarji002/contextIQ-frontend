@@ -10,7 +10,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const navigate = useNavigate(); const location = useLocation();
   const [selected, setSelected] = useState(() => sessionStorage.getItem(`workspace:${user?.id}`));
-  const list = useQuery({ queryKey: ["workspaces", user?.id], queryFn: workspaceApi.list });
+  const list = useQuery({ queryKey: ["workspaces", user?.id], queryFn: workspaceApi.list, refetchInterval: 30000 });
   const routeId = location.pathname.match(/^\/workspaces\/([^/]+)/)?.[1];
   useEffect(() => {
     if (routeId && list.data?.some(w => w.id === routeId)) { setSelected(routeId); sessionStorage.setItem(`workspace:${user?.id}`, routeId); }

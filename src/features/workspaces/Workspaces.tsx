@@ -1,18 +1,16 @@
 import { useState } from "react";
-import { useSearchParams } from "react-router";
-import { notificationApi } from "../notifications/api";
+import { Link, useSearchParams } from "react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Layers3, ArrowUpRight, Plus, Search, Files, Users, LockKeyhole, Mail } from "lucide-react";
+import { Building2, Layers3, ArrowUpRight, Plus, Search, Files, Users, LockKeyhole } from "lucide-react";
 import {
   Button,
   Card,
   ErrorState,
   Input,
-  LoadingState,
   EmptyState,
 } from "../../components/ui";
 import { useWorkspace } from "../../app/providers/WorkspaceProvider";
-import { workspaceApi, type Organization } from "./api";
+import { workspaceApi } from "./api";
 import { errorMessage } from "../../lib/api/client";
 import "./workspaces.css";
 
@@ -216,86 +214,8 @@ export function Workspaces() {
       {organizations.data
         ?.filter((o) => o.role === "ADMIN" && (!filter || o.id === filter))
         .map((o) => (
-          <OrganizationMembers key={o.id} organization={o} />
+          <Link key={o.id} className="organization-management-link" to={`/organizations/${o.id}/members`}><Building2 size={19}/><span><strong>{o.name}</strong><small>Manage members, roles and invitations</small></span><ArrowUpRight size={17}/></Link>
         ))}
     </div>
-  );
-}
-function OrganizationMembers({ organization }: { organization: Organization }) {
-  const [open, setOpen] = useState(false);
-  const [email, setEmail] = useState("");
-  const cache = useQueryClient();
-  const members = useQuery({
-    queryKey: ["organization-members", organization.id],
-    queryFn: () => workspaceApi.organizationMembers(organization.id),
-    enabled: open,
-    refetchInterval: open ? 30000 : false,
-  });
-  const add = useMutation({
-    mutationFn: workspaceApi.addOrganizationMember,
-    onSuccess: async () => {
-      setEmail("");
-      await cache.invalidateQueries({ queryKey: ["organization-invitations", organization.id] });
-    },
-  });
-  const invitations = useQuery({ queryKey: ["organization-invitations", organization.id], queryFn: () => notificationApi.sent(organization.id), enabled: open, refetchInterval: open ? 30000 : false });
-  const retry = useMutation({ mutationFn: notificationApi.retryEmail, onSuccess: () => cache.invalidateQueries({ queryKey: ["organization-invitations", organization.id] }) });
-  return (
-    <Card>
-      <details onToggle={(e) => setOpen(e.currentTarget.open)}>
-        <summary>{organization.name} · Organization members</summary>
-        <p className="muted">
-          Invite a registered account. They must accept in their account notifications before you can assign a workspace role. Email is sent when SMTP is enabled.
-        </p>
-        {invitations.isError && <p className="notice">Invitations are unavailable. Refresh your access or update the backend before inviting members.</p>}
-        <form
-          className="workspace-inline-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (!add.isPending && invitations.isSuccess) add.mutate({ id: organization.id, email });
-          }}
-        >
-          <Input
-            type="email"
-            required
-            aria-label={`Member email for ${organization.name}`}
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Registered account email"
-          />
-          <Button disabled={add.isPending || !invitations.isSuccess}><Mail size={15} /> {add.isPending ? "Inviting…" : "Invite member"}</Button>
-        </form>
-        {add.isError && <ErrorState message={errorMessage(add.error)} />}{" "}
-        {add.isSuccess && (
-          <p role="status">
-            Invitation created. Membership is pending their acceptance.{add.data?.emailStatus === "DISABLED" ? " Email is disabled; the invitation is available in their notification panel." : " Email is queued for delivery."}
-          </p>
-        )}
-        <h3 className="workspace-subheading">Active members</h3>
-        {members.isLoading ? (
-          <LoadingState />
-        ) : members.isError ? (
-          <ErrorState message={errorMessage(members.error)} />
-        ) : (
-          <ul className="workspace-member-list">
-            {members.data?.map((m) => (
-              <li key={m.userId}>
-                <span>
-                  {m.firstName} {m.lastName}
-                  <small>{m.email}</small>
-                </span>
-                <span className="badge">{m.role.toLowerCase()}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-        <h3 className="workspace-subheading">Invitations <small>Latest 100</small></h3>
-        {retry.isError && <ErrorState message={errorMessage(retry.error)} />}
-        {invitations.isLoading ? <LoadingState /> : invitations.isError ? <ErrorState message={errorMessage(invitations.error)} retry={() => void invitations.refetch()} /> : invitations.data?.length ? <ul className="workspace-member-list invitation-roster">{invitations.data.map(invite => <li key={invite.id}>
-          <span>{invite.recipientEmail}<small>Invited {new Date(invite.createdAt).toLocaleDateString()} · Email: {({ DISABLED: "disabled", QUEUED: "queued", PROCESSING: "sending", SENT: "submitted to mail server", FAILED: "delivery failed", CANCELLED: "cancelled" })[invite.emailStatus]}</small></span>
-          <span className="invitation-roster-actions"><span className={`invitation-status status-${invite.status.toLowerCase()}`}>{invite.status === "REJECTED" ? "Declined" : invite.status}</span>{invite.status === "PENDING" && ["DISABLED", "FAILED"].includes(invite.emailStatus) && <Button disabled={retry.isPending} onClick={() => retry.mutate({ organization: organization.id, id: invite.id })}>Retry email</Button>}</span>
-        </li>)}</ul> : <p className="muted">No invitations yet.</p>}
-      </details>
-    </Card>
   );
 }
