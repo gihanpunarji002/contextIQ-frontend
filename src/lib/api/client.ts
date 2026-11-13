@@ -35,7 +35,7 @@ api.interceptors.response.use(
       error.response?.status === 401 &&
       !error.config?.url?.startsWith("/auth/")
     )
-      window.dispatchEvent(new Event("Zipzipy AI:session-expired"));
+      window.dispatchEvent(new Event("zipzipyai:session-expired"));
     return Promise.reject(error);
   },
 );

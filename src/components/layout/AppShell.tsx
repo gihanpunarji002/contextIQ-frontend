@@ -19,6 +19,7 @@ import {
 import { useTheme } from "../../app/providers/ThemeProvider";
 import { useAuth } from "../../app/providers/AuthProvider";
 import { errorMessage } from "../../lib/api/client";
+import { useWorkspace } from "../../app/providers/WorkspaceProvider";
 import { ErrorState } from "../ui";
 const navigation = [
   ["/dashboard", "Overview", LayoutDashboard],
@@ -28,6 +29,7 @@ const navigation = [
   ["/settings", "Settings", Settings],
 ] as const;
 export function AppShell() {
+  const { workspace, workspaces, select } = useWorkspace();
   const [collapsed, setCollapsed] = useState(false);
   const [mobile, setMobile] = useState(false);
   const { theme, setTheme } = useTheme();
@@ -60,9 +62,9 @@ export function AppShell() {
     return () => window.removeEventListener("keydown", close);
   }, [mobile]);
   const title =
-    navigation.find(([path]) => location.pathname === path)?.[1] || "Zipzipy AI";
+    navigation.find(([path]) => location.pathname === path)?.[1] || (location.pathname.startsWith("/workspaces/") ? "Workspace" : "Zipzipy AI");
   return (
-    <div className={`shell ${collapsed ? "collapsed" : ""} ${location.pathname === "/chat" ? "assistant-shell" : ""}`}>
+    <div className={`shell ${collapsed ? "collapsed" : ""} ${(location.pathname === "/chat" || location.pathname.endsWith("/assistant")) ? "assistant-shell" : ""}`}>
       <a className="skip" href="#main">
         Skip to content
       </a>
@@ -92,7 +94,10 @@ export function AppShell() {
         <div className="workspace-label nav-label">
           <span className="workspace-icon">C</span>
           <div>
-            Development space<small>Personal account</small>
+            <label className="sr-only" htmlFor="active-workspace">Active workspace</label>
+            <select id="active-workspace" value={workspace.id} onChange={e => select(e.target.value)} style={{ maxWidth: "155px", background: "transparent", color: "inherit" }}>
+              {workspaces.map(w => <option key={w.id} value={w.id}>{w.organizationName} / {w.name}</option>)}
+            </select><small>{workspace.role.toLowerCase()} · {workspace.organizationName}</small>
           </div>
         </div>
         <p className="nav-caption nav-label">YOUR KNOWLEDGE HUB</p>
@@ -144,7 +149,7 @@ export function AppShell() {
             >
               <Menu />
             </button>
-            <span>Workspace</span>
+            <span>{workspace.name}</span>
             <span>/</span>
             <strong>{title}</strong>
           </div>

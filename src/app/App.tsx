@@ -5,6 +5,8 @@ import { AppShell } from "../components/layout/AppShell";
 import { Dashboard } from "../features/dashboard/Dashboard";
 import { Chat } from "../features/chat/Chat";
 import { Documents } from "../features/documents/Documents";
+import { WorkspaceProvider } from "./providers/WorkspaceProvider";
+import { WorkspaceDetail } from "../features/workspaces/WorkspaceDetail";
 import { Workspaces } from "../features/workspaces/Workspaces";
 import { Settings } from "../features/settings/Settings";
 import { AuthProvider } from "./providers/AuthProvider";
@@ -29,7 +31,7 @@ export function App() {
                 element={<AuthPage key="register" register />}
               />
               <Route element={<RequireAuth />}>
-                <Route element={<AppShell />}>
+                <Route element={<WorkspaceProvider><AppShell /></WorkspaceProvider>}>
                   <Route
                     path="/"
                     element={<Navigate to="/dashboard" replace />}
@@ -38,6 +40,7 @@ export function App() {
                   <Route path="/chat" element={<Chat />} />
                   <Route path="/documents" element={<Documents />} />
                   <Route path="/workspaces" element={<Workspaces />} />
+                  <Route path="/workspaces/:workspaceId/:tab?" element={<WorkspaceDetail />} />
                   <Route path="/settings" element={<Settings />} />
                   <Route
                     path="*"

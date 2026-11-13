@@ -1,6 +1,10 @@
+import { workspaceConfig } from "../workspaces/api";
 import { api } from "../../lib/api/client";
 export interface DocumentRecord {
   id: string;
+  folderId: string | null;
+  workspaceId: string;
+  createdBy: string;
   filename: string;
   sizeBytes: number;
   chunkCount: number;
@@ -8,11 +12,12 @@ export interface DocumentRecord {
   createdAt: string;
 }
 export const documentApi = {
-  list: async () => (await api.get<DocumentRecord[]>("/documents")).data,
-  upload: async (file: File) => {
+  list: async (workspaceId?: string) => (await api.get<DocumentRecord[]>("/documents", workspaceConfig(workspaceId))).data,
+  upload: async ({ file, folderId, workspaceId }: { file: File; folderId?: string; workspaceId?: string }) => {
     const form = new FormData();
     form.append("file", file);
-    return (await api.post<DocumentRecord>("/documents", form, { timeout: 150000 })).data;
+    if (folderId) form.append("folderId", folderId);
+    return (await api.post<DocumentRecord>("/documents", form, { timeout: 150000, ...workspaceConfig(workspaceId) })).data;
   },
-  remove: async (id: string) => { await api.delete(`/documents/${id}`); },
+  remove: async (id: string, workspaceId?: string) => { await api.delete(`/documents/${id}`, workspaceConfig(workspaceId)); },
 };

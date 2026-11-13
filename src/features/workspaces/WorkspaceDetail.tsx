@@ -1,0 +1,41 @@
+import { useState } from "react";
+import { Link, NavLink, useParams, useNavigate } from "react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button, Card, ErrorState, Input, LoadingState } from "../../components/ui";
+import { useWorkspace } from "../../app/providers/WorkspaceProvider";
+import { Documents } from "../documents/Documents";
+import { Chat } from "../chat/Chat";
+import { workspaceApi, type WorkspaceRole } from "./api";
+import { errorMessage } from "../../lib/api/client";
+import "./workspaces.css";
+
+export function WorkspaceDetail() { const {workspace}=useWorkspace();return <Detail key={workspace.id}/>; }
+function Detail() {
+  const {workspace,canAdmin}=useWorkspace();const {tab}=useParams();const root=`/workspaces/${workspace.id}`;
+  return <div className="workspace-page"><header className="workspace-detail-heading"><Link to="/workspaces">All workspaces</Link><div><span className="muted">{workspace.organizationName}</span><h1>{workspace.name}</h1><p>{workspace.description}</p></div><span className="badge">{workspace.role.toLowerCase()} access</span></header>
+    <nav className="workspace-tabs" aria-label="Workspace sections">{[["","Overview"],["knowledge","Knowledge"],["assistant","Assistant"],["members","Members"],["settings","Settings"]].map(([path,label])=><NavLink key={path} end to={`${root}${path?`/${path}`:""}`}>{label}</NavLink>)}</nav>
+    {!tab?<><div className="workspace-stats"><Card><span>Documents</span><strong>{workspace.documentCount}</strong></Card><Card><span>Folders</span><strong>{workspace.folderCount}</strong></Card><Card><span>Members</span><strong>{workspace.memberCount}</strong></Card></div><Card><h2>Knowledge with a clear boundary</h2><p>Members can ask questions using this workspace's knowledge. Folders organize that knowledge; conversations remain private to their creator.</p><div className="workspace-inline-form"><Link className="button primary" to={`${root}/knowledge`}>Browse knowledge</Link><Link className="button" to={`${root}/assistant`}>Ask the assistant</Link></div></Card></>
+      :tab==="knowledge"?<Documents/>:tab==="assistant"?<Chat/>:tab==="members"?(canAdmin?<Members/>:<Card><h2>Members</h2><p>Workspace admins manage membership. Your role is {workspace.role.toLowerCase()}.</p></Card>)
+      :tab==="settings"?(canAdmin?<Settings/>:<Card><h2>Settings</h2><p>Workspace settings require Admin access.</p></Card>):<Card><h2>Section not found</h2><Link to={root}>Return to overview</Link></Card>}
+  </div>;
+}
+function Members() {
+  const {workspace}=useWorkspace();const cache=useQueryClient();const [email,setEmail]=useState("");const [role,setRole]=useState<WorkspaceRole>("VIEWER");
+  const members=useQuery({queryKey:["workspace-members",workspace.id],queryFn:()=>workspaceApi.members(workspace.id)});
+  const refresh=async()=>{await Promise.all([cache.invalidateQueries({queryKey:["workspace-members",workspace.id]}),cache.invalidateQueries({queryKey:["workspaces"]})]);};
+  const save=useMutation({mutationFn:workspaceApi.setMember,onSuccess:async()=>{setEmail("");await refresh();}});
+  const remove=useMutation({mutationFn:workspaceApi.removeMember,onSuccess:refresh});
+  return <Card><h2>Workspace members</h2><p className="muted">Admins manage members and settings. Editors manage knowledge. Viewers read documents and ask questions.</p>
+    {workspace.personal?<p>Personal workspaces cannot be shared. Create a team workspace to collaborate.</p>:<form className="workspace-inline-form" onSubmit={e=>{e.preventDefault();if(!save.isPending)save.mutate({id:workspace.id,email,role});}}>
+      <Input type="email" required aria-label="Workspace member email" placeholder="Existing organization member's email" value={email} onChange={e=>setEmail(e.target.value)}/><select aria-label="New member role" value={role} onChange={e=>setRole(e.target.value as WorkspaceRole)}>{["VIEWER","EDITOR","ADMIN"].map(r=><option key={r}>{r}</option>)}</select><Button disabled={save.isPending}>Add member</Button></form>}
+    {save.isError&&<ErrorState message={errorMessage(save.error)}/>} {remove.isError&&<ErrorState message={errorMessage(remove.error)}/>}
+    {members.isPending?<LoadingState/>:members.isError?<ErrorState message={errorMessage(members.error)} retry={()=>void members.refetch()}/>:<div className="table-scroll"><table><thead><tr><th>Member</th><th>Role</th><th>Actions</th></tr></thead><tbody>{members.data.map(m=><tr key={m.userId}><td>{m.firstName} {m.lastName}<small className="muted block">{m.email}</small></td><td><select aria-label={`Role for ${m.email}`} value={m.role} disabled={workspace.personal||save.isPending||remove.isPending} onChange={e=>save.mutate({id:workspace.id,email:m.email,role:e.target.value as WorkspaceRole})}>{["ADMIN","EDITOR","VIEWER"].map(r=><option key={r}>{r}</option>)}</select></td><td><Button disabled={workspace.personal||save.isPending||remove.isPending} onClick={()=>{if(window.confirm(`Remove ${m.email} from this workspace? They will lose access to its knowledge and their workspace chats.`))remove.mutate({id:workspace.id,userId:m.userId});}}>Remove</Button></td></tr>)}</tbody></table></div>}
+  </Card>;
+}
+function Settings() {
+  const {workspace}=useWorkspace();const cache=useQueryClient();const navigate=useNavigate();const [name,setName]=useState(workspace.name);const [description,setDescription]=useState(workspace.description);
+  const save=useMutation({mutationFn:workspaceApi.update,onSuccess:()=>cache.invalidateQueries({queryKey:["workspaces"]})});
+  const remove=useMutation({mutationFn:workspaceApi.remove,onSuccess:async()=>{navigate("/workspaces");await cache.invalidateQueries({queryKey:["workspaces"]});}});
+  return <><Card><h2>Workspace settings</h2><form className="workspace-form" onSubmit={e=>{e.preventDefault();if(!save.isPending)save.mutate({id:workspace.id,name,description});}}><label>Name<Input required maxLength={80} value={name} onChange={e=>setName(e.target.value)}/></label><label>Description<Input maxLength={500} value={description} onChange={e=>setDescription(e.target.value)}/></label><Button className="primary" disabled={save.isPending}>Save changes</Button></form>{save.isError&&<ErrorState message={errorMessage(save.error)}/>} {save.isSuccess&&<p role="status">Workspace updated.</p>}</Card>
+    {!workspace.personal&&<Card><h2>Delete workspace</h2><p>This revokes access for all members. Stored records are retained; deletion does not permanently purge documents or conversations.</p><Button disabled={remove.isPending} onClick={()=>{if(window.confirm(`Delete ${workspace.name}? All members will lose access.`))remove.mutate(workspace.id);}}>Delete workspace</Button>{remove.isError&&<ErrorState message={errorMessage(remove.error)}/>}</Card>}</>;
+}

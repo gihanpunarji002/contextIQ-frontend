@@ -1,0 +1,28 @@
+.workspace-page { display:grid; gap:22px; min-width:0; }
+.workspace-page select { font:inherit; font-size:.82rem; border:1px solid var(--border); border-radius:7px; padding:9px; color:var(--text); background:var(--surface); max-width:100%; }
+.workspace-organization-bar,.workspace-inline-form { display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+.workspace-inline-form { margin:18px 0; }
+.workspace-inline-form .input { flex:1; min-width:190px; }
+.workspace-form { display:grid; gap:16px; max-width:620px; }
+.workspace-form label { display:grid; gap:7px; font-size:.85rem; }
+.workspace-form .button { justify-self:start; }
+.workspace-tile { display:grid; gap:12px; align-content:start; }
+.workspace-tile h2,.workspace-tile p { margin:0; }
+.workspace-tile p { color:var(--muted); font-size:.85rem; line-height:1.6; }
+.workspace-tile .button { justify-self:start; margin-top:5px; }
+.workspace-tile-icon { padding:10px; border:1px solid var(--border); border-radius:9px; color:var(--accent); }
+.workspace-tile-meta { display:flex; gap:20px; color:var(--muted); font-size:.78rem; }
+.workspace-detail-heading h1 { margin:5px 0 8px; font-size:1.8rem; }
+.workspace-detail-heading > a { display:block; margin-bottom:18px; color:var(--accent); font-size:.8rem; }
+.workspace-detail-heading p { color:var(--muted); }
+.workspace-tabs { display:flex; overflow-x:auto; gap:5px; border-bottom:1px solid var(--border); }
+.workspace-tabs a { padding:12px 18px; color:var(--muted); text-decoration:none; border-bottom:2px solid transparent; font-size:.85rem; }
+.workspace-tabs a.active { border-color:var(--accent); color:var(--text); font-weight:600; }
+.workspace-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+.workspace-stats .card { display:grid; gap:12px; }.workspace-stats strong { font-size:1.8rem; }
+.workspace-stats span { color:var(--muted); font-size:.85rem; }
+.workspace-member-list { list-style:none; padding:0; }
+.workspace-member-list li { display:flex; justify-content:space-between; gap:12px; padding:12px 0; border-bottom:1px solid var(--border); }
+.workspace-member-list small { display:block; color:var(--muted); margin-top:4px; }
+.workspace-page summary { cursor:pointer; font-weight:600; }
+@media(max-width:600px) { .workspace-stats { grid-template-columns:1fr; } .workspace-tabs a { padding:12px; } }

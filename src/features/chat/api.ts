@@ -1,12 +1,15 @@
+import { workspaceConfig } from "../workspaces/api";
 import { api } from "../../lib/api/client";
 export interface SelectedDocument {
   id: string;
   filename: string;
   available: boolean;
 }
+export interface SelectedFolder { id: string; name: string; available: boolean; documentCount: number }
 export interface DocumentContext {
   useDocuments: boolean;
   documents: SelectedDocument[];
+  folders: SelectedFolder[];
 }
 export interface Conversation {
   id: string;
@@ -52,35 +55,41 @@ export interface AiStatus {
   configured: boolean;
   documentSearch?: boolean;
   documentSelection?: boolean;
+  folderSelection?: boolean;
 }
 export const chatApi = {
-  context: async (id: string) =>
-    (await api.get<DocumentContext>(`/chat/conversations/${id}/documents`))
+  context: async (id: string, workspaceId?: string) =>
+    (await api.get<DocumentContext>(`/chat/conversations/${id}/documents`, workspaceConfig(workspaceId)))
       .data,
   selectDocuments: async ({
     id,
     context,
+    workspaceId,
   }: {
     id: string;
     context: DocumentContext;
+    workspaceId?: string;
   }) =>
     (
       await api.post<DocumentContext>(`/chat/conversations/${id}/documents`, {
         useDocuments: context.useDocuments,
         documentIds: context.documents.map((d) => d.id),
-      })
+        folderIds: context.folders.map(f => f.id),
+      }, workspaceConfig(workspaceId))
     ).data,
   status: async () => (await api.get<AiStatus>("/ai/status")).data,
-  conversations: async () =>
-    (await api.get<Conversation[]>("/chat/conversations")).data,
-  messages: async (id: string) =>
-    (await api.get<Message[]>(`/chat/conversations/${id}/messages`)).data,
-  send: async (data: {
+  conversations: async (workspaceId?: string) =>
+    (await api.get<Conversation[]>("/chat/conversations", workspaceConfig(workspaceId))).data,
+  messages: async (id: string, workspaceId?: string) =>
+    (await api.get<Message[]>(`/chat/conversations/${id}/messages`, workspaceConfig(workspaceId))).data,
+  send: async ({ workspaceId, ...data }: {
+    workspaceId?: string;
     message: string;
     conversationId?: string;
     useDocuments?: boolean;
     documentIds?: string[];
+    folderIds?: string[];
   }) =>
-    (await api.post<ChatReply>("/chat/messages", data, { timeout: 270000 }))
+    (await api.post<ChatReply>("/chat/messages", data, { timeout: 270000, ...workspaceConfig(workspaceId) }))
       .data,
 };

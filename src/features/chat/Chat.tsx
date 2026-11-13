@@ -7,6 +7,9 @@ import { errorMessage } from "../../lib/api/client";
 import { useAuth } from "../../app/providers/AuthProvider";
 import { Button, EmptyState, ErrorState, LoadingState } from "../../components/ui";
 import { documentApi } from "../documents/api";
+import { useWorkspace } from "../../app/providers/WorkspaceProvider";
+import { folderApi } from "../documents/folders";
+import { KnowledgeScope } from "./KnowledgeScope";
 import { AiOrb } from "./AiOrb";
 import "./chat.css";
 
@@ -20,11 +23,13 @@ const starters = [
 ];
 
 export function Chat() {
+  const { workspace } = useWorkspace();
   const [params] = useSearchParams();
-  return <ChatWorkspace key={params.get("conversation") || "new"} />;
+  return <ChatWorkspace key={`${workspace.id}:${params.get("conversation") || "new"}`} />;
 }
 
 function ChatWorkspace() {
+  const { workspace } = useWorkspace();
   const [params, setParams] = useSearchParams();
   const id = params.get("conversation") || undefined;
   const [draft, setDraft] = useState("");
@@ -32,8 +37,7 @@ function ChatWorkspace() {
   const [motionPaused, setMotionPaused] = useState(false);
   const { user } = useAuth();
   const input = useRef<HTMLTextAreaElement>(null);
-  const [newContext, setNewContext] = useState<DocumentContext>({ useDocuments: false, documents: [] });
-  const [documentSearch, setDocumentSearch] = useState("");
+  const [newContext, setNewContext] = useState<DocumentContext>({ useDocuments: false, documents: [], folders: [] });
   const queryClient = useQueryClient();
   const provider = useQuery({
     queryKey: ["ai-status"],
@@ -44,33 +48,42 @@ function ChatWorkspace() {
   const available = !!provider.data?.configured && !legacyProvider;
   const live = provider.data?.mode === "OLLAMA";
   const supportsSelection = provider.data?.documentSelection === true;
+  const supportsFolders = provider.data?.folderSelection === true;
+  const folderList = useQuery({ queryKey: ["folders", workspace.id], queryFn: () => folderApi.list(workspace.id), enabled: supportsFolders });
   const supportsDocuments = live && provider.data?.documentSearch === true;
-  const savedContext = useQuery({ queryKey: ["conversation-documents", id], queryFn: () => chatApi.context(id!), enabled: !!id && supportsSelection });
-  const library = useQuery({ queryKey: ["documents"], queryFn: documentApi.list, enabled: supportsSelection });
-  const context = id ? savedContext.data ?? { useDocuments: false, documents: [] } : newContext;
+  const savedContext = useQuery({ queryKey: ["conversation-documents", workspace.id, id], queryFn: () => chatApi.context(id!, workspace.id), enabled: !!id && supportsSelection });
+  const library = useQuery({ queryKey: ["documents", workspace.id], queryFn: () => documentApi.list(workspace.id), enabled: supportsSelection });
+  const context = id ? savedContext.data ?? { useDocuments: false, documents: [], folders: [] } : newContext;
+  const selectedFolders = (context.folders ?? []).map(f => {
+    const current = folderList.data?.find(item => item.id === f.id);
+    return { ...f, name: current?.name ?? f.name, available: f.available && (!folderList.data || !!current), documentCount: current?.documentCount ?? f.documentCount };
+  });
+  const normalizedContext = { ...context, folders: selectedFolders };
   const useDocuments = context.useDocuments;
   const selectedDocuments = context.documents.map(d => ({ ...d, available: d.available && (!library.data || library.data.some(item => item.id === d.id)) }));
+  const hasSources = selectedDocuments.some(d => d.available) || selectedFolders.some(f => f.available && f.documentCount > 0);
   const saveSelection = useMutation({
     mutationFn: chatApi.selectDocuments,
     onSuccess: (data) => {
-      queryClient.setQueryData(["conversation-documents", id], data);
+      queryClient.setQueryData(["conversation-documents", workspace.id, id], data);
       void queryClient.invalidateQueries({ queryKey: ["conversations"] });
     },
   });
-  const contextBusy = saveSelection.isPending || !supportsSelection || (!!id && (savedContext.isPending || savedContext.isError));
+  const contextBusy = (selectedFolders.length > 0 && !supportsFolders) || saveSelection.isPending || !supportsSelection || (!!id && (savedContext.isPending || savedContext.isError));
   function updateContext(next: DocumentContext) {
     if (send.isPending || contextBusy) return;
-    if (id) saveSelection.mutate({ id, context: next });
+    next = { ...next, folders: next.folders ?? [] };
+    if (id) saveSelection.mutate({ id, context: next, workspaceId: workspace.id });
     else setNewContext(next);
   }
   const end = useRef<HTMLDivElement>(null);
   const conversations = useQuery({
-    queryKey: ["conversations"],
-    queryFn: chatApi.conversations,
+    queryKey: ["conversations", workspace.id],
+    queryFn: () => chatApi.conversations(workspace.id),
   });
   const messages = useQuery({
-    queryKey: ["messages", id],
-    queryFn: () => chatApi.messages(id!),
+    queryKey: ["messages", workspace.id, id],
+    queryFn: () => chatApi.messages(id!, workspace.id),
     enabled: !!id,
   });
   const send = useMutation({
@@ -80,9 +93,9 @@ function ChatWorkspace() {
       setParams({ conversation: data.conversationId });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["conversations"] }),
-        queryClient.invalidateQueries({ queryKey: ["conversation-documents", data.conversationId] }),
+        queryClient.invalidateQueries({ queryKey: ["conversation-documents", workspace.id, data.conversationId] }),
         queryClient.invalidateQueries({
-          queryKey: ["messages", data.conversationId],
+          queryKey: ["messages", workspace.id, data.conversationId],
         }),
       ]);
     },
@@ -94,17 +107,17 @@ function ChatWorkspace() {
     if (
       draft.trim() &&
       !send.isPending && !contextBusy &&
-      (!useDocuments || selectedDocuments.some(d => d.available)) &&
+      (!useDocuments || hasSources) &&
       available &&
       (!useDocuments || supportsDocuments) &&
       !(id && (messages.isError || messages.isPending))
     )
-      send.mutate({ message: draft.trim(), conversationId: id, useDocuments, documentIds: context.documents.map(d => d.id) });
+      send.mutate({ workspaceId: workspace.id, message: draft.trim(), conversationId: id, useDocuments, documentIds: context.documents.map(d => d.id), folderIds: selectedFolders.map(f => f.id) });
   }
   function select(next?: string) {
     if (send.isPending || saveSelection.isPending) return;
     setParams(next ? { conversation: next } : {});
-    if (!next) setNewContext({ useDocuments: false, documents: [] });
+    if (!next) setNewContext({ useDocuments: false, documents: [], folders: [] });
     setDraft("");
     send.reset();
   }
@@ -218,28 +231,9 @@ function ChatWorkspace() {
             {id && supportsSelection && savedContext.isPending && <LoadingState />}
             {savedContext.isError && <ErrorState message={errorMessage(savedContext.error)} retry={() => void savedContext.refetch()} />}
             {saveSelection.isError && <ErrorState message={errorMessage(saveSelection.error)} retry={() => saveSelection.variables && saveSelection.mutate(saveSelection.variables)} />}
-            {(useDocuments || selectedDocuments.length > 0) && <section className="studio-document-selection" aria-label="Conversation documents">
-              <div className="studio-selected-chips">
-                {selectedDocuments.map(d => <span key={d.id} className={`studio-source-chip ${!d.available ? "unavailable" : ""}`}>
-                  <FileText size={14} /><span>{d.filename}{!d.available && <strong> · Unavailable (deleted)</strong>}</span>
-                  <button type="button" aria-label={`Remove ${d.filename} from selection`} disabled={send.isPending || contextBusy}
-                    onClick={() => updateContext({ ...context, documents: context.documents.filter(item => item.id !== d.id) })}>×</button>
-                </span>)}
-              </div>
-              <details className="studio-document-picker">
-                <summary>Select documents ({selectedDocuments.length}/50)</summary>
-                <label>Search your library<input value={documentSearch} onChange={e => setDocumentSearch(e.target.value)} placeholder="Find a document…" /></label>
-                {library.isPending ? <LoadingState /> : library.isError ? <ErrorState message={errorMessage(library.error)} retry={() => void library.refetch()} /> :
-                  <div className="studio-document-options">{library.data?.filter(d => d.filename.toLowerCase().includes(documentSearch.toLowerCase())).map(d => {
-                    const checked = context.documents.some(item => item.id === d.id);
-                    return <label key={d.id}><input type="checkbox" checked={checked} disabled={send.isPending || contextBusy || (!checked && selectedDocuments.length >= 50)}
-                      onChange={() => updateContext({ ...context, documents: checked ? context.documents.filter(item => item.id !== d.id) : [...context.documents, { id: d.id, filename: d.filename, available: true }] })} />
-                      <span>{d.filename}</span><small>{d.chunkCount} passages</small></label>;
-                  })}{!library.data?.some(d => d.filename.toLowerCase().includes(documentSearch.toLowerCase())) && <p>No documents found. <Link to="/documents">Open your library</Link></p>}</div>}
-              </details>
-              <small role="status">{saveSelection.isPending ? "Saving selection…" : useDocuments && !selectedDocuments.some(d => d.available) ? "Select at least one available document before sending." : id ? "Selection saved with this conversation." : "Selection will be saved with your first message."}</small>
-              {selectedDocuments.some(d => !d.available) && <p className="muted">Unavailable documents will not be searched. Earlier answer excerpts remain available as historical evidence.</p>}
-            </section>}
+            {(useDocuments || selectedDocuments.length > 0 || selectedFolders.length > 0) && <KnowledgeScope
+              context={normalizedContext} onChange={updateContext} disabled={send.isPending || contextBusy}
+              foldersSupported={supportsFolders} saving={saveSelection.isPending} persisted={!!id} />}
             {send.isError && <ErrorState message={`${errorMessage(send.error)} Check history before retrying: a timed-out request may already have saved.`} retry={() => submit()} />}
             <form className="studio-composer" onSubmit={e => { e.preventDefault(); submit(); }}>
               <label className="sr-only" htmlFor="message">Message the assistant</label>
@@ -248,13 +242,13 @@ function ChatWorkspace() {
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); } }} />
               <div className="studio-compose-toolbar">
                 <div className="studio-compose-tools">
-                  <Link className="studio-library" to="/documents" aria-label="Upload or manage documents" title="Upload or manage documents"><Plus size={18} /></Link>
+                  <Link className="studio-library" to={`/workspaces/${workspace.id}/knowledge`} aria-label="Upload or manage documents" title="Upload or manage documents"><Plus size={18} /></Link>
                   <label className={`studio-document-toggle ${useDocuments ? "active" : ""}`} title={!supportsDocuments ? "Update the backend to Phase 3 to enable document search" : "Ground answers in your indexed documents"}>
                     <input type="checkbox" checked={useDocuments} disabled={(!supportsDocuments && !useDocuments) || send.isPending || contextBusy} onChange={e => updateContext({ ...context, useDocuments: e.target.checked })} />
-                    <FileText size={14} /><span>Search selected documents</span>
+                    <FileText size={14} /><span>Search knowledge</span>
                   </label>
                 </div>
-                <Button className="studio-send" type="submit" aria-label="Send message" disabled={!draft.trim() || send.isPending || contextBusy || (useDocuments && !selectedDocuments.some(d => d.available)) || !available || (useDocuments && !supportsDocuments) || (!!id && (messages.isError || messages.isPending))}><ArrowUp size={19} /></Button>
+                <Button className="studio-send" type="submit" aria-label="Send message" disabled={!draft.trim() || send.isPending || contextBusy || (useDocuments && !hasSources) || !available || (useDocuments && !supportsDocuments) || (!!id && (messages.isError || messages.isPending))}><ArrowUp size={19} /></Button>
               </div>
             </form>
             <div className="studio-compose-note"><span>{mock ? "Demo mode · No LLM is called" : useDocuments ? "Document answers · Verify the source excerpts" : "General chat · No documents searched"}</span><span>Shift + Enter for a new line</span></div>
@@ -271,9 +265,9 @@ function ChatWorkspace() {
                 <ArrowUpRight size={13} />
               </button>) : <div className="studio-history-empty"><MessageSquare size={25} strokeWidth={1} /><strong>{historySearch ? "No matching conversations" : "Your next idea starts here"}</strong><p>{historySearch ? "Try another search." : "Start a chat and it will be saved here for you."}</p></div>}
           </div>
-          <Link to="/documents" className="studio-knowledge"><Library size={20} strokeWidth={1.5} /><strong>Bring your own context</strong><p>Add documents for answers grounded in your knowledge.</p><span>Open document library <ArrowUpRight size={13} /></span></Link>
+          <Link to={`/workspaces/${workspace.id}/knowledge`} className="studio-knowledge"><Library size={20} strokeWidth={1.5} /><strong>Bring your own context</strong><p>Add documents for answers grounded in your knowledge.</p><span>Open document library <ArrowUpRight size={13} /></span></Link>
           <label className="studio-history-search"><Search size={16} /><input aria-label="Search conversations" placeholder="Search conversations" value={historySearch} onChange={e => setHistorySearch(e.target.value)} /></label>
-          <div className="studio-private"><ShieldCheck size={13} /> Conversations belong to your account</div>
+          <div className="studio-private"><ShieldCheck size={13} /> Private conversations · {workspace.name}</div>
         </aside>
       </div>
     </div>
